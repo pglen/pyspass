@@ -13,6 +13,8 @@ from Crypto.Hash import SHA256
 # Removed some punctuation chars, may be used as separators etc ...
 # Do not restructure this after you used some data
 
+# Reduced them for more compatibility
+
 #Punct = "!#$%&*+-/:;=?^_~"
 Punct = "%+-/:;=_"
 

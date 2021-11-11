@@ -53,7 +53,7 @@ class MainWin(Gtk.Window):
 
         #Gtk.register_stock_icons()
 
-        self.set_title("pypass")
+        self.set_title("PysPass Password Manager")
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
 
         #ic = Gtk.Image(); ic.set_from_stock(Gtk.STOCK_DIALOG_INFO, Gtk.ICON_SIZE_BUTTON)
