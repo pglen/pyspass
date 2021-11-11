@@ -15,4 +15,4 @@ SHA512 strong, no passes are saved, only site, site login and serial is saved.
  Pass is displayed as a QR code. (For your eyes only)
  The default tab is for site, the pass is not shown unless 'Auth' is selected.
 
-![Screen Shot](screen.png)
+![Screen Shot](screen2.png)
