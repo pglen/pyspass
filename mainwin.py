@@ -32,12 +32,15 @@ from gi.repository import GObject
 from gi.repository import GdkPixbuf
 from gi.repository import Pango
 
-DEF_LEN = 14        # Default pass len
+DEF_LEN = 14            # Default pass len
+MAX_TRY = 4
 
+# Fields become editable
 fields = ("Site", "Login", "Serial", "Pass", "Override",
             "Len", "Notes",  "ChkSum", "UUID",  )
 
-passx = " - " * 10
+passx   = " - " * 10
+gl_try  = 0
 
 # ------------------------------------------------------------------------
 
@@ -120,6 +123,7 @@ class MainWin(Gtk.Window):
         labn = Gtk.Label.new_with_mnemonic("  Ma_ster Pass:")
         hbox4.pack_start(labn, 0, 0, 4)
         self.input = Gtk.Entry()
+        self.input.connect("activate", self.activate)
         self.input.set_visibility(False)
         labn.set_mnemonic_widget(self.input)
 
@@ -129,10 +133,12 @@ class MainWin(Gtk.Window):
         buttA.connect("clicked", self.master_new)
         hbox4.pack_start(buttA, False, 0, 2)
 
-        lab2 = Gtk.Label(" Status: ");  hbox4.pack_start(lab2, 0, 0, 0)
-        self.status = Gtk.Label("Idle.                 "); hbox4.pack_start(self.status, 1, 1, 0)
+        lab2 = Gtk.Label("  Status:   ");  hbox4.pack_start(lab2, 0, 0, 0)
+        self.status = Gtk.Label("Idle.");
+        self.status.set_xalign(0)
+        hbox4.pack_start(self.status, 1, 1, 0)
 
-        buttB = Gtk.Button.new_with_mnemonic("   Lock   ")
+        buttB = Gtk.Button.new_with_mnemonic("   Lock _Data  ")
         buttB.connect("clicked", self.master_lock)
         hbox4.pack_start(buttB, False, 0, 2)
 
@@ -201,17 +207,21 @@ class MainWin(Gtk.Window):
         butt1 = Gtk.Button.new_with_mnemonic("   _New Row  ")
         butt1.connect("clicked", self.add_newrow)
         hbox6.pack_start(butt1, 0, 0, 2)
-        butt2 = Gtk.Button.new_with_mnemonic("   _Del Row  ")
+        butt2 = Gtk.Button.new_with_mnemonic("   Del Row  ")
         butt2.connect("clicked", self.del_row)
         hbox6.pack_start(butt2, 0, 0, 2)
 
         hbox6.pack_start(Gtk.Label("   "), 0, 0, 2)
         butt1 = Gtk.Button.new_with_mnemonic("   Copy Lo_gin  ")
-        butt1.connect("clicked", self.add_newrow)
+        butt1.connect("clicked", self.copy)
         hbox6.pack_start(butt1, 0, 0, 2)
         butt2 = Gtk.Button.new_with_mnemonic("   Copy Au_th  ")
-        butt2.connect("clicked", self.del_row)
+        butt2.connect("clicked", self.copy2)
         hbox6.pack_start(butt2, 0, 0, 2)
+        butt2a = Gtk.Button.new_with_mnemonic("   Copy Override  ")
+        butt2a.connect("clicked", self.copy3)
+        hbox6.pack_start(butt2a, 0, 0, 2)
+
         hbox6.pack_start(Gtk.Label(" "), 1, 1, 2)
 
         self.hpane.add(self.scroll)
@@ -232,6 +242,33 @@ class MainWin(Gtk.Window):
         self.add(vbox)
         self.show_all()
 
+        self.stat_time = 0
+        GLib.timeout_add(1000, self.timer)
+
+    def activate(self, arg1):
+        print("activate")
+        self.master_unlock()
+
+    def copy(self, arg):
+        print("Called copy")
+        if not self.master:
+            self.message("Cannot copy record if master key is not entered")
+            return
+        self.status.set_text("Copied login")
+        self.stat_time = 0;
+
+    def copy2(self, arg):
+        print("Called copy2")
+        if not self.master:
+            self.message("Cannot copy auth record if master key is not entered")
+            return
+
+    def copy3(self, arg):
+        print("Called copy3")
+        if not self.master:
+            self.message("Cannot copy override record if master key is not entered")
+            return
+
     def row_activate(self, arg1):
         sel = self.tree.get_selection()
         tree, curr = sel.get_selected()
@@ -243,9 +280,23 @@ class MainWin(Gtk.Window):
         self.apply_qr(row[1], row[3], row[4], row[0])
 
     def del_row(self, arg1):
-        pass
+
+        if not self.master:
+            self.message("Cannot delete record if master key is not entered")
+            return
+
+        sel = self.tree.get_selection()
+        tree, curr = sel.get_selected()
+        if not curr:
+            self.message("Plase selet a row to delete")
+            return
+
 
     def add_newrow(self, arg1):
+
+        if not self.master:
+            self.message("Cannot add record if master key is not entered")
+            return
 
         #(random.random() * 100)
         xlen = len(self.model)
@@ -342,6 +393,9 @@ class MainWin(Gtk.Window):
         self.exit_all()
 
     def exit_all(self):
+        if gl_try > MAX_TRY:
+            print("Extra sleep on too many tries")
+            timer.sleep(1)
         Gtk.main_quit()
 
     def fill_samples(self):
@@ -369,6 +423,13 @@ class MainWin(Gtk.Window):
 
     def master_lock(self, butt):
 
+        if self.master:
+            self.status.set_text("Locked Master pass")
+            self.stat_time = 0;
+
+        self.master = False
+        self.input.set_text("")
+
         for row in self.model:
             row[3] = passx
             row[4] = passx
@@ -376,12 +437,18 @@ class MainWin(Gtk.Window):
         for aa in self.cells:
             aa.set_property("editable", False)
 
+
     def master_unlock(self):
         master = self.input.get_text()
         if not master:
             self.message("\nCannot use empty Master Pass")
             return
         #serial = 0;
+
+        if self.master:
+            self.message("\nAlready unlocked")
+            return
+
         cno = 0
         for row in self.model:
             #print("data", row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8])
@@ -395,7 +462,13 @@ class MainWin(Gtk.Window):
             else:
                 if row[7] != sss:
                     #print("Invalid checksum")
-                    self.message("Invalid master pass")
+                    global gl_try
+                    if gl_try > MAX_TRY:
+                        self.message("Too many tries")
+                        return
+
+                    self.message("Invalid Master pass")
+                    gl_try += 1
                     break
             self.master = True
             self.model[cno] = (row[0], row[1], row[2], strx[:int(row[5])], row[4], row[5], row[6], row[7], row[8])
@@ -464,6 +537,13 @@ class MainWin(Gtk.Window):
     def activate_about(self, action):
         print( "activate_about called")
         pass
+
+    def timer(self):
+        #print("Timer fired")
+        self.stat_time += 1
+        if self.stat_time == 3:
+            self.status.set_text("Idle")
+        return True
 
 # Start of program:
 

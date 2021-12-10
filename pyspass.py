@@ -14,7 +14,8 @@ import pgpasql
 # ------------------------------------------------------------------------
 # Globals
 
-version = "0.00"
+# Version of the program
+version = "0.50"
 
 # ------------------------------------------------------------------------
 
@@ -24,7 +25,6 @@ def phelp():
     print( "Usage: " + os.path.basename(sys.argv[0]) + " [options]")
     print()
     print( "Options:    -d level  - Debug level 0-10")
-    print( "            -p        - Port to use (default: 9999)")
     print( "            -v        - Verbose")
     print( "            -V        - Version")
     print( "            -q        - Quiet")
@@ -39,14 +39,12 @@ def pversion():
 
     # option, long_option,  var_name,   initial_value, function
 optarrlong = \
-    ["d:",    "debug=",      "pgdebug",  0,              None],      \
     ["p:",    "port",        "port",     9999,           None],      \
     ["v",     "verbose",     "verbose",  0,              None],      \
-    ["q",     "quiet",       "quiet",    0x10,           None],      \
-    ["t",     "test",        "test",     "x",            None],      \
+    ["q",     "quiet",       "quiet",    0,              None],      \
+    ["t",     "test",        "test",     0,              None],      \
     ["V",     "version",     None,       None,           pversion],  \
     ["h",     "help",        None,       None,           phelp],     \
-    ["i:",    "input=",      "input",      "-",          None],     \
 
 conf = ConfigLong(optarrlong)
 
