@@ -20,8 +20,9 @@ from pymenu import  *
 
 sys.path.append('../pycommon')
 
-from pgutil import  *
-from pgui import  *
+import  pypacker
+from    pgutil import  *
+from    pgui import  *
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -51,10 +52,9 @@ class MainWin(Gtk.Window):
         Gtk.Window.__init__(self, Gtk.WindowType.TOPLEVEL)
         self.sql = sql
         self.master = False
+        self.pb  = pypacker.packbin()
 
         #self = Gtk.Window(Gtk.WindowType.TOPLEVEL)
-
-        #Gtk.register_stock_icons()
 
         self.set_title("PysPass Password Manager")
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
@@ -120,12 +120,14 @@ class MainWin(Gtk.Window):
         vbox.pack_start(bbox, False, 0, 0)
 
         hbox4.pack_start(Gtk.Label("  "), 0, 0, 4)
-        labn = Gtk.Label.new_with_mnemonic("  Ma_ster Pass:")
-        hbox4.pack_start(labn, 0, 0, 4)
+
+        self.labn = Gtk.Label.new_with_mnemonic("  Ma_ster Pass:")
+
+        hbox4.pack_start(self.labn, 0, 0, 4)
         self.input = Gtk.Entry()
         self.input.connect("activate", self.activate)
         self.input.set_visibility(False)
-        labn.set_mnemonic_widget(self.input)
+        self.labn.set_mnemonic_widget(self.input)
 
         hbox4.pack_start(self.input, 0, 0, 4)
 
@@ -195,9 +197,12 @@ class MainWin(Gtk.Window):
 
         self.hpane = Gtk.HPaned()
 
-        self.fill_samples()
         self.scroll = Gtk.ScrolledWindow()
         self.scroll.add_with_viewport(self.tree)
+
+        ret = self.fill_samples()
+        if not ret:
+            self.labn.set_markup_with_mnemonic(" <span foreground=\"#880000\"> !!! New !!!</span> Ma_ster Pass:")
 
         #vbox3 = Gtk.VBox()
         #vbox3.pack_start(self.scroll, 1, 1, 0)
@@ -242,6 +247,8 @@ class MainWin(Gtk.Window):
         self.add(vbox)
         self.show_all()
 
+        self.input.grab_focus_without_selecting()
+
         self.stat_time = 0
         GLib.timeout_add(1000, self.timer)
 
@@ -274,6 +281,7 @@ class MainWin(Gtk.Window):
         tree, curr = sel.get_selected()
         if not curr:
             return
+
         #print("row_activate",  curr)
         ppp = self.model.get_path(curr)
         row = self.model[ppp]
@@ -288,7 +296,7 @@ class MainWin(Gtk.Window):
         sel = self.tree.get_selection()
         tree, curr = sel.get_selected()
         if not curr:
-            self.message("Plase selet a row to delete")
+            self.message("Plase select a row to delete")
             return
 
 
@@ -305,6 +313,15 @@ class MainWin(Gtk.Window):
                     "Notes Here", "Chksum", str(uuid.uuid4()),)
               )
 
+        sel = self.tree.get_selection()
+        iter = self.model.get_iter_first()
+        while True:
+            iter2 =  self.model.iter_next(iter)
+            if not iter2:
+                break
+            iter = iter2
+        sel.select_iter(iter)
+
     def apply_qr(self, strx, passx, over, site):
         #print ("new QR", strx)
         qq =  qrcode.make(strx, version=1)
@@ -319,7 +336,6 @@ class MainWin(Gtk.Window):
         qq =  qrcode.make(site, version=1)
         dd = self.image2pixbuf(qq)
         self.edit4.set_from_pixbuf(dd)
-
 
     def image2pixbuf(self, im):
         """Convert Pillow image to GdkPixbuf"""
@@ -384,9 +400,7 @@ class MainWin(Gtk.Window):
                 self.model[path][idx] = text
 
             #self.master_unlock()
-
-            aa = self.model[path]
-            self.sql.put(aa[6], aa[0], aa[1], aa[2], aa[4], aa[5], aa[7])
+            self.save_row(self.model[path])
 
     def  OnExit(self, arg, srg2 = None):
         #print("exit")
@@ -395,32 +409,47 @@ class MainWin(Gtk.Window):
     def exit_all(self):
         if gl_try > MAX_TRY:
             print("Extra sleep on too many tries")
-            timer.sleep(1)
+            time.sleep(1)
         Gtk.main_quit()
 
     def fill_samples(self):
-        kkk = self.sql.getallkeys()
+        ret = 0
+        kkk = self.sql.getunikeys()
         #print("keys", kkk)
         if not kkk:
-            serial = "0";
-            xlen = "14"
-            host = "host.com"; login = "username1"
-            self.model.append(None, (host, login,  serial, passx, passx, xlen, "Notes", passx, str(uuid.uuid4()) ))
+            # fill in something (so no blank seet effect)
+            serial = "0"; xlen = "14"
+            initial = [("host.com", "username1"), ("example.com", "username2"),
+                        ("noname.com", "username3"), ]
+            for host, login in initial:
+                self.model.append(None, (host, login,  serial, passx, passx, xlen, "Notes", passx, str(uuid.uuid4()) ))
 
-            host = "example.com"; login = "username2"
-            self.model.append(None, (host, login,  serial, passx, passx, xlen, "Notes", passx, str(uuid.uuid4()) ))
-
-            host = "noname.com"; login = "username3"
-            self.model.append(None, (host, login,  serial, passx, passx, xlen, "Notes", passx, str(uuid.uuid4()) ))
-
+            # Save it
             for aa in self.model:
-                #uuu = uuid.uuid4()
-                self.sql.put(aa[6], aa[0], aa[1], aa[2], aa[4], aa[5], aa[7])
+                #print("writing", aa[8], aa[0:])
+                ddd = self.pb.encode_data("", aa[0:])
+                self.sql.putuni(aa[8], ddd)
         else:
             for bb in kkk:
-                ddd = self.sql.get(bb[0])
-                self.model.append(None, (ddd[0], ddd[1], ddd[2],  passx, ddd[3], ddd[4], bb[0], "", ""))
+                #print(bb[0])
+                ppp = self.sql.getuni(bb[0])
+                #print("ppp", ppp)
+                ddd = self.pb.decode_data(ppp[0])[0]
+                #print(ddd)
+                self.model.append(None, (ddd[0], ddd[1], ddd[2], ddd[3], ddd[4], ddd[5], ddd[6], ddd[7], ddd[8]))
+                if ddd[7] !=  passx:
+                    ret |=  True
+        return ret
 
+    def save_row(self, row):
+        rrr = row[0:]
+        rrr[3] = passx
+        rrr[4] = passx
+        print("rrr", rrr)
+        eee = self.pb.encode_data("", rrr[0:])
+        self.sql.putuni(rrr[8], eee)
+
+    # --------------------------------------------------------------------
     def master_lock(self, butt):
 
         if self.master:
@@ -437,16 +466,21 @@ class MainWin(Gtk.Window):
         for aa in self.cells:
             aa.set_property("editable", False)
 
-
     def master_unlock(self):
+
+        if self.master:
+            self.message("\nAlready unlocked")
+            return
+
         master = self.input.get_text()
+
         if not master:
             self.message("\nCannot use empty Master Pass")
             return
         #serial = 0;
 
-        if self.master:
-            self.message("\nAlready unlocked")
+        if len(master) < 6:
+            self.message("\nCannot use less than 6 chars")
             return
 
         cno = 0
@@ -468,10 +502,17 @@ class MainWin(Gtk.Window):
                         return
 
                     self.message("Invalid Master pass")
+                    usleep(20)
+
+                    self.status.set_text("Sleeping on retry")
+                    self.stat_time = 0;
+                    time.sleep(.3)
                     gl_try += 1
                     break
+
             self.master = True
             self.model[cno] = (row[0], row[1], row[2], strx[:int(row[5])], row[4], row[5], row[6], row[7], row[8])
+            self.save_row(self.model[cno])
 
             #for aa in range(self.tree.get_n_columns()):
             #ttt = self.tree.get_column(aa)
@@ -543,6 +584,7 @@ class MainWin(Gtk.Window):
         self.stat_time += 1
         if self.stat_time == 3:
             self.status.set_text("Idle")
+
         return True
 
 # Start of program:

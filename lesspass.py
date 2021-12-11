@@ -13,10 +13,11 @@ from Crypto.Hash import SHA256
 # Removed some punctuation chars, may be used as separators etc ...
 # Do not restructure this after you used some data
 
-# Reduced them for more compatibility
-
 #Punct = "!#$%&*+-/:;=?^_~"
-Punct = "%+-/:;=_"
+Punct = "!#$%&*+-/:;=?^_~"
+
+# Reduced them for more compatibility
+#Punct = "%+-/:;=_"
 
 def gen_pass(strx):
 
@@ -24,7 +25,7 @@ def gen_pass(strx):
     passx = hh.hexdigest()
 
     # Make sure thay are less than 255
-    ids = string.ascii_lowercase * 4 + string.ascii_uppercase * 2 + string.digits * 2 + Punct * 2
+    ids = string.ascii_lowercase * 3 + string.ascii_uppercase * 2 + string.digits * 2 + Punct * 2
     #print (len(ids), ids)
 
     strx = ""
