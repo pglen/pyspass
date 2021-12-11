@@ -223,8 +223,6 @@ def  usleep(msec):
         Gtk.main_iteration_do(False)
 
 
-
-
 # -----------------------------------------------------------------------
 # Call func with all processes, func called with stat as its argument
 # Function may return True to stop iteration

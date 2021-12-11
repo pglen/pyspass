@@ -13,6 +13,6 @@ A python / PyGObject version of the popular password manager concept.
 SHA512 strong, no passes are saved, only site, site login and serial is saved.
 
  Pass is displayed as a QR code. (For your eyes only)
- The default tab is for site, the pass QR is not shown unless 'Auth' is selected.
+ The default tab is for the site, the pass QR is not shown unless 'Auth' is selected.
 
 ![Screen Shot](screen2.png)

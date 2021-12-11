@@ -252,8 +252,9 @@ class MainWin(Gtk.Window):
         self.stat_time = 0
         GLib.timeout_add(1000, self.timer)
 
+
     def activate(self, arg1):
-        print("activate")
+        #print("activate")
         self.master_unlock()
 
     def copy(self, arg):
@@ -363,7 +364,9 @@ class MainWin(Gtk.Window):
 
         # Changed?
         if  self.model[path][idx] != text:
-            print("modified", path, self.model[path][idx], text)
+
+            #print("modified", path, self.model[path][idx], text)
+
             row = self.model[path]
             if idx == 0 or idx == 1:
                 self.model[path][idx] = str(text)
@@ -436,6 +439,10 @@ class MainWin(Gtk.Window):
                 #print("ppp", ppp)
                 ddd = self.pb.decode_data(ppp[0])[0]
                 #print(ddd)
+                if ddd[4] != passx:
+                    ddd.append(lesspass.dec_pass(ddd[4], self.input.get_text()))
+                    ddd[4] = passx
+
                 self.model.append(None, (ddd[0], ddd[1], ddd[2], ddd[3], ddd[4], ddd[5], ddd[6], ddd[7], ddd[8]))
                 if ddd[7] !=  passx:
                     ret |=  True
@@ -444,8 +451,13 @@ class MainWin(Gtk.Window):
     def save_row(self, row):
         rrr = row[0:]
         rrr[3] = passx
-        rrr[4] = passx
-        print("rrr", rrr)
+
+        if rrr[4] != passx:
+            old = rrr[4]
+            rrr[4] = lesspass.enc_pass(rrr[4], self.input.get_text())
+            #print("org", "'"+old+"'", "dec", "'"+dec+"'")
+
+        #print("save_row rrr", rrr)
         eee = self.pb.encode_data("", rrr[0:])
         self.sql.putuni(rrr[8], eee)
 
@@ -465,6 +477,8 @@ class MainWin(Gtk.Window):
         pass
         for aa in self.cells:
             aa.set_property("editable", False)
+
+    # ------------------------------------------------------------------------------
 
     def master_unlock(self):
 
@@ -511,6 +525,7 @@ class MainWin(Gtk.Window):
                     break
 
             self.master = True
+            #print("unlocking", row[0:])
             self.model[cno] = (row[0], row[1], row[2], strx[:int(row[5])], row[4], row[5], row[6], row[7], row[8])
             self.save_row(self.model[cno])
 
@@ -524,6 +539,8 @@ class MainWin(Gtk.Window):
             cno += 1
 
         self.row_activate(None)
+        self.labn.set_markup_with_mnemonic(" Ma_ster Pass:")
+
 
     def key_press_event(self, win, event):
         #print( "key_press_event", win, event)
