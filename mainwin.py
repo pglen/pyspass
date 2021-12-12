@@ -53,6 +53,7 @@ class MainWin(Gtk.Window):
         self.sql = sql
         self.master = False
         self.pb  = pypacker.packbin()
+        self.darr = []
 
         #self = Gtk.Window(Gtk.WindowType.TOPLEVEL)
 
@@ -364,9 +365,7 @@ class MainWin(Gtk.Window):
 
         # Changed?
         if  self.model[path][idx] != text:
-
             #print("modified", path, self.model[path][idx], text)
-
             row = self.model[path]
             if idx == 0 or idx == 1:
                 self.model[path][idx] = str(text)
@@ -403,7 +402,7 @@ class MainWin(Gtk.Window):
                 self.model[path][idx] = text
 
             #self.master_unlock()
-            self.save_row(self.model[path])
+            self.save_row(self.model[path], int(path))
 
     def  OnExit(self, arg, srg2 = None):
         #print("exit")
@@ -437,26 +436,33 @@ class MainWin(Gtk.Window):
                 #print(bb[0])
                 ppp = self.sql.getuni(bb[0])
                 #print("ppp", ppp)
-                ddd = self.pb.decode_data(ppp[0])[0]
+                try:
+                    ddd = self.pb.decode_data(ppp[0])[0]
+                except:
+                    print("Cannot decode", ppp);
+                    ddd = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+                    continue
+
                 #print(ddd)
+
                 if ddd[4] != passx:
-                    ddd.append(lesspass.dec_pass(ddd[4], self.input.get_text()))
+                    #self.darr.append(lesspass.dec_pass(ddd[4], self.input.get_text()))
+                    self.darr.append(ddd[4])
                     ddd[4] = passx
+                else:
+                    self.darr.append(ddd[4])
 
                 self.model.append(None, (ddd[0], ddd[1], ddd[2], ddd[3], ddd[4], ddd[5], ddd[6], ddd[7], ddd[8]))
                 if ddd[7] !=  passx:
                     ret |=  True
+        #print("darr", self.darr)
         return ret
 
-    def save_row(self, row):
+    def save_row(self, row, cnt):
         rrr = row[0:]
         rrr[3] = passx
-
-        if rrr[4] != passx:
-            old = rrr[4]
-            rrr[4] = lesspass.enc_pass(rrr[4], self.input.get_text())
-            #print("org", "'"+old+"'", "dec", "'"+dec+"'")
-
+        if len(self.darr[cnt]) == 1:
+            rrr[4] = self.darr[cnt]
         #print("save_row rrr", rrr)
         eee = self.pb.encode_data("", rrr[0:])
         self.sql.putuni(rrr[8], eee)
@@ -507,6 +513,9 @@ class MainWin(Gtk.Window):
             if len(row[7]) <= len(passx):
                 #print("gen", sss)
                 row[7] = sss
+            if len(self.darr[cno]) == 1:
+                print("decode", self.darr[cno])
+                row[4] = self.darr[cno][2]
             else:
                 if row[7] != sss:
                     #print("Invalid checksum")
@@ -527,7 +536,7 @@ class MainWin(Gtk.Window):
             self.master = True
             #print("unlocking", row[0:])
             self.model[cno] = (row[0], row[1], row[2], strx[:int(row[5])], row[4], row[5], row[6], row[7], row[8])
-            self.save_row(self.model[cno])
+            self.save_row(self.model[cno], cno)
 
             #for aa in range(self.tree.get_n_columns()):
             #ttt = self.tree.get_column(aa)

@@ -61,7 +61,7 @@ def enc_pass(strx, passx):
     #print("hexx", hexx)
     iv2 = base64.b64encode(iv).decode('cp437')
     ppp = pypacker.packbin().encode_data("", (lenx, iv2, hexx,))
-    #print("encrypted", ppp)
+    print("encrypted", ppp)
     return ppp
 
 def dec_pass(strx, passx):
@@ -76,7 +76,7 @@ def dec_pass(strx, passx):
 
     cipher = AES.new(passpad, AES.MODE_CBC, iv)
     msg = cipher.decrypt(uhexx).decode('cp437')[:ppp[0]]
-    #print("decrypted", msg)
+    print("decrypted", msg)
     return msg
 
 
