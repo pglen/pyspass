@@ -197,6 +197,7 @@ class MainWin(Gtk.Window):
             cntf += 1
 
         self.hpane = Gtk.HPaned()
+        self.hpane.set_position(300)
 
         self.scroll = Gtk.ScrolledWindow()
         self.scroll.add_with_viewport(self.tree)
