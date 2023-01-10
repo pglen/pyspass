@@ -547,7 +547,6 @@ class MainWin(Gtk.Window):
                     self.cells[aa].set_property("editable", True)
 
             cno += 1
-
         self.row_activate(None)
         self.labn.set_markup_with_mnemonic(" Ma_ster Pass:")
 
