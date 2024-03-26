@@ -1,38 +1,34 @@
 #!/usr/bin/env python
 
-from __future__ import absolute_import
-from __future__ import print_function
+#from __future__ import absolute_import
+#from __future__ import print_function
 
-import string, random, base64
+import sys, string, random, base64
 
 from Crypto.Hash import SHA256
 from Crypto.Cipher import AES
 from Crypto import Random
 
-#import Crypto.Util.randpool
-#print(Crypto.Util.randpool.__doc__)
-
-import sys
-
-sys.path.append('../pycommon')
-import pypacker
+import pyvpacker
 
 # Removed some punctuation chars, may be used as separators etc ...
-# Do not restructure this after you used some data
+# Do not restructure this after you created / used some data as
+# this will change the calculated hashes.
 
 #Punct = "!#$%&*+-/:;=?^_~"
-Punct = "!#$%&*+-/:;=?^_~"
+#Punct = "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+#Punct = "!#$%&*+-/:;=?^_~"
 
-# Reduced them for more compatibility
-#Punct = "%+-/:;=_"
+# Reduced for more compatibility
+Punct = "%+-:;=_"
 
 def gen_pass(strx):
 
     hh = SHA256.new(); hh.update(strx.encode())
     passx = hh.hexdigest()
 
-    # Make sure thay are less than 255
-    ids = string.ascii_lowercase * 3 + string.ascii_uppercase * 2 + string.digits * 2 + Punct * 2
+    # Make sure they are less than 255
+    ids = string.ascii_lowercase * 2 + string.ascii_uppercase + string.digits + Punct * 2
     #print (len(ids), ids)
 
     strx = ""
@@ -79,4 +75,4 @@ def dec_pass(strx, passx):
     print("decrypted", msg)
     return msg
 
-
+# EOF

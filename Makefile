@@ -9,21 +9,13 @@
 #
 
 all:
-	@echo "Type 'make help' for a list of targets"
+	@echo "Targets: setup clean cleandata -- type 'make help' for a list of targets"
 
 help:
-	@echo
 	@echo "Targets:"
-	@echo "	 make install  -- Install PyEdPro (unofficial structure)"
 	@echo "	 make setup    -- Run the setup.py script as install "
 	@echo "	 make pack     -- package PyEdPro "
-	@echo "	 make remove   -- remove (all) traces of pyedpro from the system
-	@echo
-
-# OLD install; use setup.py
-
-#install:
-#	@python3 ./install.py
+	@echo "	 make remove   -- remove (all) traces of pyspass from the system."
 
 setup:
 	@python3 ./setup.py install
@@ -38,15 +30,11 @@ pack:
 
 clean:
 	rm -f *.pyc
-	rm -f pedlib/*.pyc
-	rm -rf pedlib/__pycache__
-	rm -rf ../pycommon/__pycache__
-	rm -f  ../pycommon/*.pyc
+	rm -rf __pycache__
 
-#CHECK=xxx
-
-echo:
-	@echo Echoing: ${CHECK}
+cleandata:
+	rm -f passdata.sqlt
+	rm -f ~/.pyspass/passdata.sqlt
 
 git:
 	git add .

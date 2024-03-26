@@ -6,6 +6,9 @@ import traceback
 #import warnings; warnings.simplefilter("ignore");
 #import Gtk; warnings.simplefilter("default")
 
+base = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(base))
+
 from pymenu import  *
 
 import gi

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
-from __future__ import absolute_import
-from __future__ import print_function
+#from __future__ import absolute_import
+#from __future__ import print_function
 
 import sys, os, time, sqlite3, traceback
 
 # Replaces g c o n f, so it is less platforrm dependent
+
+base = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(base))
+
+#print(sys.path)
 
 import pgutil
 

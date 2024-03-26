@@ -1,15 +1,28 @@
 #!/usr/bin/env python3
 
-from __future__ import absolute_import
-from __future__ import print_function
-
 import os, sys, getopt, signal, select, socket, time, struct
 import random, stat
 
-from mainwin import  *
-from pgutil import  *
+import  pyvpacker
 
-import pgpasql
+import gettext
+gettext.bindtextdomain('thisapp', './locale/')
+gettext.textdomain('thisapp')
+_ = gettext.gettext
+
+base = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(base))
+sys.path.append(os.path.join(base,  'pyspass'))
+
+try:
+    from pyspass import pgutil
+except:
+    # Global
+    sys.path.append(os.path.join(base,  '..', 'pyspass'))
+    from pyspass import pgutil
+
+from pyspass import mainwin
+from pyspass import pgpasql
 
 # ------------------------------------------------------------------------
 # Globals
@@ -42,25 +55,35 @@ optarrlong = \
     ["p:",    "port",        "port",     9999,           None],      \
     ["v",     "verbose",     "verbose",  0,              None],      \
     ["q",     "quiet",       "quiet",    0,              None],      \
-    ["t",     "test",        "test",     0,              None],      \
+    ["r",     "docroot",     "droot",    "~/.pyspass",   None],      \
+    ["d",     "debug",       "pgdebug",   0,             None],     \
     ["V",     "version",     None,       None,           pversion],  \
     ["h",     "help",        None,       None,           phelp],     \
 
-conf = ConfigLong(optarrlong)
+conf = pgutil.ConfigLong(optarrlong)
 
-if __name__ == '__main__':
-
-    #global mw
+def mainfunc():
 
     args = conf.comline(sys.argv[1:])
     if conf.err:
         print(conf.err)
         sys.exit(1)
 
+    mainwin.loadicon()
+
     #conf.printvars()
-    pgsql = pgpasql.pgpasql("testdata.sqlt")
-    mw = MainWin(pgsql)
-    Gtk.main()
+    basedir = os.path.expanduser(conf.droot)
+    if not os.path.isdir(basedir):
+        print("Makdir")
+        os.mkdir(basedir)
+    os.chdir(basedir)
+
+    pgsql = pgpasql.pgpasql("passdata.sqlt")
+    mw = mainwin.MainWin(pgsql, conf.pgdebug)
+    mw.run()
     sys.exit(0)
+
+if __name__ == '__main__':
+    mainfunc()
 
 # EOF
