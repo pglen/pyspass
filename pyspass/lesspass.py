@@ -28,17 +28,24 @@ def gen_pass(strx):
     passx = hh.hexdigest()
 
     # Make sure they are less than 255
+    idl = string.ascii_lowercase * 2 + string.ascii_uppercase
     ids = string.ascii_lowercase * 2 + string.ascii_uppercase + string.digits + Punct * 2
     #print (len(ids), ids)
 
-    strx = ""
-    for aa in range(len(passx)//2):
+    xarr = []
+    skip = 4
+    for aa in range(skip//2):
         ss =  passx[2*aa] +  passx[2*aa+1]
         #print(ss, int(ss, 16))
-        strx += ids[int(ss, 16) % len(ids)]
+        xarr.append(idl[int(ss, 16) % len(idl)])
 
-    #print (len(strx), strx)
-    return strx
+    for aa in range(skip//2, len(passx)//2):
+        ss =  passx[2*aa] +  passx[2*aa+1]
+        #print(ss, int(ss, 16))
+        xarr.append(ids[int(ss, 16) % len(ids)])
+    strr = "".join(xarr)
+    print ("xlen", len(passx), "len:", len(strr), "strr", strr)
+    return strr
 
 def padx(strx):
     #print("padx", "'"+strx+"'")

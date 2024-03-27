@@ -24,7 +24,8 @@ class pgpasql():
             self.conn = sqlite3.connect(file)
         except:
             print("Cannot open/create db:", file, sys.exc_info())
-            return
+            raise
+            #return
         try:
             self.c = self.conn.cursor()
             self.c.execute("PRAGMA synchronous=OFF")

@@ -31,6 +31,7 @@ pack:
 clean:
 	rm -f *.pyc
 	rm -rf __pycache__
+	rm -rf build/*
 
 cleandata:
 	rm -f passdata.sqlt

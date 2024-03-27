@@ -178,33 +178,13 @@ def cmp(aa, bb):
             #print ("crap")
             pass
 
-# ------------------------------------------------------------------------
-# Show a regular message:
-'''
-def xmessage(strx, title = None, icon = Gtk.MESSAGE_INFO):
-
-    dialog = Gtk.MessageDialog(None, Gtk.DIALOG_DESTROY_WITH_PARENT,
-        icon, Gtk.BUTTONS_CLOSE, strx)
-
-    if title:
-        dialog.set_title(title)
-    else:
-        dialog.set_title("ePub Reader")
-
-    # Close dialog on user response
-    dialog.connect("response", lambda d, r: d.destroy())
-    dialog.show()
-'''
-
 # -----------------------------------------------------------------------
 # Sleep just a little, but allow the system to breed
 
 def  usleep(msec):
 
-#
 #    got_clock = time.clock() + float(msec) / 1000
 #    #print (got_clock)
-#
 #    while True:
 #        if time.clock() > got_clock:
 #            break

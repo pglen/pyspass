@@ -74,12 +74,14 @@ def mainfunc():
     #conf.printvars()
     basedir = os.path.expanduser(conf.droot)
     if not os.path.isdir(basedir):
-        print("Makdir")
+        #print("Make dir", basedir)
         os.mkdir(basedir)
+
     os.chdir(basedir)
 
     pgsql = pgpasql.pgpasql("passdata.sqlt")
     mw = mainwin.MainWin(pgsql, conf.pgdebug)
+    mw.verbose = conf.verbose
     mw.run()
     sys.exit(0)
 
