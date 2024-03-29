@@ -59,17 +59,23 @@ editable  = (True, True, True, False, True,
 centered  = ( False, False, True, False, False,
                 True, False,  False, False,  )
 
-# No blank sheet
-initial = [ \
-                (MASTER_TEMPLATE, "template.com", "username"),
-                 ("",             "example.com",  "username"),
-                 ("",             "domain.com",   "username"),
-          ]
-
 # Placeholder
 passx   = " - " * 6
 
+# No blank sheet
+initial =   [ \
+                (MASTER_TEMPLATE, "template.com", "username"),
+                 ("",             "example.com",  "username"),
+                 ("",             "domain.com",   "username"),
+            ]
+
+newdata =   [ \
+                "HostID", "LoginName",  "0", passx, passx, str(DEF_LEN),
+                    "Notes Here", "ChkSum", "ID",
+            ]
+
 gl_try  = 0
+gl_cnt = 0
 verbose = 0
 
 # ------------------------------------------------------------------------
@@ -354,7 +360,6 @@ class MainWin(Gtk.Window):
         self.butt_del.set_sensitive(flag)
         self.butt_export.set_sensitive(flag)
 
-
     def export(self, arg):
         pass
         print("Export")
@@ -464,26 +469,30 @@ class MainWin(Gtk.Window):
 
     def add_newrow(self, arg1):
 
+        global gl_cnt
         if self.master != FLAG_ON:
             self.message("Cannot add record if master key is not entered.")
             return
 
-        #(random.random() * 100)
         xlen = len(self.model)
 
-        ddd = ( \
-                "host_%d" % xlen, "login",  "0", passx, passx, str(DEF_LEN),
-                    "Notes Here", "Chksum", str(uuid.uuid1()),
-              )
+        ddd = newdata[:]
+        ddd[0] = "HostID_%d" % (gl_cnt) ; gl_cnt += 1
+        ddd[8] = str(uuid.uuid1())
 
         master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
         strx = ddd[0] + ddd[1] + master + str(int(ddd[2]))
+
         ppp = lesspass.gen_pass(strx)
         hhh = lesspass.gen_hash(strx)
 
-        #self.model.append(None, ddd)
+        ddd[3] = ppp[:int(ddd[5])] ;
+        ddd[7] = hhh
         self.alldat.append(ddd)
+
         self.data_to_tree()
+        self.save_row(ddd)
+
         sel = self.tree.get_selection()
         iter = self.model.get_iter_first()
 
@@ -763,13 +772,6 @@ class MainWin(Gtk.Window):
         masterpass = self.input.get_text()
         self.input.set_text("")
 
-        # It exist in for a shor time ...
-        #print("masterpass org", masterpass)
-        masterpass = lesspass.enc_pass(masterpass, DEF_ENCPASS)
-        #print("masterpass_enc", masterpass)
-        masterpass = lesspass.dec_pass(masterpass, DEF_ENCPASS)
-        print("masterpass pro", masterpass)
-
         if not masterpass:
             self.message("\nCannot use empty Master Pass.")
             return
@@ -779,6 +781,12 @@ class MainWin(Gtk.Window):
             #self.input.set_text("")
             #self.input2.set_text("")
             return
+
+        # It exist in for a shor time ...
+        #masterpass = lesspass.enc_pass(masterpass, DEF_ENCPASS)
+        ##print("masterpass_enc", masterpass)
+        #masterpass = lesspass.dec_pass(masterpass, DEF_ENCPASS)
+
         success = False
         flag = False
 
