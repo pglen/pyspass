@@ -10,11 +10,11 @@ from Crypto.Hash import SHA256
 
 import  lesspass
 
-from pymenu import  *
+#from pymenu import  *
 
 import  pyvpacker
 from    pgutil import  *
-from    pgui import  *
+#from    pgui import  *
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -33,8 +33,6 @@ MASTER_TEMPLATE = "e86c1b3c-eb7c-11ee-9b87-4b6ca61ffd8e"
 F_SER, F_HASH,
 F_NOTE, F_ID) = list(range(6))
 
-DEF_ENCPASS = "12345678"
-
 # Make even and odd flags for obfuscation. This way boolean desision
 # is made on an integer instead of 0 and 1
 
@@ -49,7 +47,7 @@ for aa in range(6):
 
 # Field names
 fields = ("Site", "Login", "Serial", "Pass", "Override",
-            "Len", "Notes",  "ChkSum", "UUID",  )
+            "Pass Len", "Notes",  "ChkSum", "UUID",  )
 
 # Fields become editable (ordinal sensitive)
 editable  = (True, True, True, False, True,
@@ -60,7 +58,7 @@ centered  = ( False, False, True, False, False,
                 True, False,  False, False,  )
 
 # Placeholder
-passx   = " - " * 6
+passx  =  " - " * 6 + "   "
 
 # No blank sheet
 initial =   [ \
@@ -89,7 +87,7 @@ class MainWin(Gtk.Window):
         self.pgdebug = pgdebug
         self.master = FLAG_OFF
         # So this is never empty, add bogus default
-        self.master_save =  lesspass.enc_pass(DEF_ENCPASS, DEF_ENCPASS)
+        self.master_save =  lesspass.enc_pass(lesspass.DEF_ENCPASS, lesspass.DEF_ENCPASS)
         self.alldat = []
         self.ini = False
         self.pb = pyvpacker.packbin()
@@ -139,19 +137,19 @@ class MainWin(Gtk.Window):
 
         vbox = Gtk.VBox(); hbox4 = Gtk.HBox(); hbox5 = Gtk.HBox()
 
-        merge = Gtk.UIManager()
-        #self.mywin.set_data("ui-manager", merge)
-
-        aa = create_action_group(self)
-        merge.insert_action_group(aa, 0)
-        self.add_accel_group(merge.get_accel_group())
-
-        merge_id = merge.new_merge_id()
-
-        try:
-            mergeid = merge.add_ui_from_string(ui_info)
-        except GLib.GError as msg:
-            print("Building menus failed: %s" % msg)
+        #merge = Gtk.UIManager()
+        ##self.mywin.set_data("ui-manager", merge)
+        #
+        #aa = create_action_group(self)
+        #merge.insert_action_group(aa, 0)
+        #self.add_accel_group(merge.get_accel_group())
+        #
+        #merge_id = merge.new_merge_id()
+        #
+        #try:
+        #    mergeid = merge.add_ui_from_string(ui_info)
+        #except GLib.GError as msg:
+        #    print("Building menus failed: %s" % msg)
 
         hbox4.pack_start(Gtk.Label("  "), 0, 0, 2)
 
@@ -171,6 +169,7 @@ class MainWin(Gtk.Window):
         self.tree = Gtk.TreeView(self.model)
         self.tree.connect("cursor-changed", self.row_activate)
         self.tree.connect("key-press-event", self.onTreeNavigateKeyPress)
+        self.tree.connect("button-press-event", self.tree_press_event)
 
         self.cells = []; cntf = 0
         for aa in fields:
@@ -184,9 +183,9 @@ class MainWin(Gtk.Window):
 
         if self.ini:
             self.labn = Gtk.Label.new_with_mnemonic("  New master Pass:")
-            self.labn.set_markup_with_mnemonic(" <span foreground=\"#AA0000\"> !!! New M    aster Pass: !!! </span>")
+            self.labn.set_markup_with_mnemonic(" <span foreground=\"#AA0000\"> !!! Ne_w Master Pass: !!! </span>")
         else:
-            self.labn = Gtk.Label.new_with_mnemonic("  Master Pass:")
+            self.labn = Gtk.Label.new_with_mnemonic("  Master Pa_ss:")
 
         hbox4.pack_start(self.labn, 0, 0, 4)
 
@@ -297,7 +296,7 @@ class MainWin(Gtk.Window):
         self.butt_new.connect("clicked", self.add_newrow)
         hbox6.pack_start(self.butt_new, 0, 0, 2)
 
-        self.butt_del = Gtk.Button.new_with_mnemonic("   Del Row  ")
+        self.butt_del = Gtk.Button.new_with_mnemonic("   Del _Row  ")
         self.butt_del.set_sensitive(False)
         self.butt_del.connect("clicked", self.del_row)
         hbox6.pack_start(self.butt_del, 0, 0, 2)
@@ -348,21 +347,65 @@ class MainWin(Gtk.Window):
     def run(self):
         Gtk.main()
 
+    def _create_menuitem(self, string, action, arg = None):
+        rclick_menu = Gtk.MenuItem(string)
+        rclick_menu.connect("activate", action, string, arg);
+        rclick_menu.show()
+        return rclick_menu
+
+    def menu_copy(self, menu, menutext, arg):
+        print("menu", menutext, arg)
+        if arg == 0:
+            pass
+        elif arg == 1:
+            self.copy2(0)
+        elif arg == 2:
+            self.copy3(0)
+        elif arg == 3:
+            self.copy(0)
+
+    def tree_press_event(self, widget, event):
+        if event.type == Gdk.EventType.BUTTON_PRESS:
+            if event.button == 3:
+                #print("Right click")
+                menu = Gtk.Menu()
+
+                if self.master != FLAG_ON:
+                    menu.append(self._create_menuitem("Must enter  master pass first", self.menu_copy, 0))
+                else:
+                    menu.append(self._create_menuitem("Copy Pass", self.menu_copy, 1))
+                    menu.append(self._create_menuitem("Copy Override", self.menu_copy, 2))
+                    menu.append(self._create_menuitem("Copy User (login) name", self.menu_copy, 3))
+                menu.popup_at_pointer(event)
+
     def show_passes(self, arg):
         flag = arg.get_active()
         self.input.set_visibility(flag)
         self.input2.set_visibility(flag)
 
     def allow_adm(self, arg):
-        #print("allow", arg.get_active())
         flag = arg.get_active()
         self.butt_new.set_sensitive(flag)
         self.butt_del.set_sensitive(flag)
         self.butt_export.set_sensitive(flag)
 
     def export(self, arg):
-        pass
         print("Export")
+
+        if self.master != FLAG_ON:
+            self.message("Cannot export if master key is not entered.")
+            return
+
+        fp = open("export.txt", "wb")
+
+        for aa in self.alldat:
+            #print(aa)
+            bstr = ", ".join(aa)
+            #for bb in aa:
+            #    bstr += bb.encode()
+            fp.write(bstr.encode() + b"\n")
+
+        fp.close()
 
     def activate2(self, arg1):
         #print("activate2")
@@ -407,7 +450,7 @@ class MainWin(Gtk.Window):
             return
         self.status.set_text("Copied pass")
         self.stat_time = 5;
-        ttt = self.tree.get_model().get_value(curr, 2)
+        ttt = self.tree.get_model().get_value(curr, 3)
         self.clipboard.set_text(ttt, len(ttt))
 
     def copy3(self, arg):
@@ -417,7 +460,7 @@ class MainWin(Gtk.Window):
             return
         self.status.set_text("Copied override")
         self.stat_time = 5;
-        ttt = self.tree.get_model().get_value(curr, 3)
+        ttt = self.tree.get_model().get_value(curr, 4)
         self.clipboard.set_text(ttt, len(ttt))
 
     def row_activate(self, arg1):
@@ -430,7 +473,8 @@ class MainWin(Gtk.Window):
         ppp = self.model.get_path(curr)
         row = self.model[ppp]
         self.apply_qr(row[1], row[3], row[4], row[0])
-        self.status.set_text("Selected site: '%s'" % row[0])
+        if self.master == FLAG_ON:
+            self.status.set_text("Selected site: '%s'" % row[0])
         self.stat_time = 4;
 
     def del_row(self, arg1):
@@ -452,14 +496,14 @@ class MainWin(Gtk.Window):
             self.message("Cannot delete master template.")
             return
 
-        print("remove row", curr, id)
+        #print("remove row", curr, id)
         for aa in range(len(self.alldat)):
             try:
                 if self.alldat[aa][8] == id:
                     del self.alldat[aa]
                     ret = self.sql.rmone(id)
                     print("ret:", ret)
-                    #break # If multiple entries with the same ID, nuke em
+                    # break # If multiple entries with the same ID, nuke em
 
             except:
                 pass
@@ -474,19 +518,15 @@ class MainWin(Gtk.Window):
             self.message("Cannot add record if master key is not entered.")
             return
 
-        xlen = len(self.model)
+        #xlen = len(self.model)
 
+        # Construct new
         ddd = newdata[:]
         ddd[0] = "HostID_%d" % (gl_cnt) ; gl_cnt += 1
         ddd[8] = str(uuid.uuid1())
 
-        master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
-        strx = ddd[0] + ddd[1] + master + str(int(ddd[2]))
-
-        ppp = lesspass.gen_pass(strx)
-        hhh = lesspass.gen_hash(strx)
-
-        ddd[3] = ppp[:int(ddd[5])] ;
+        ppp, hhh = lesspass.gen_pass_hash(ddd, self.master_save)
+        ddd[3] = ppp  #ppp[:int(ddd[5])] ;
         ddd[7] = hhh
         self.alldat.append(ddd)
 
@@ -556,68 +596,71 @@ class MainWin(Gtk.Window):
             self.message("Cannot edit if master key is not entered.")
             return
         #print("edited", text, idx)
+
         # Changed?
-        if  self.model[path][idx] != text:
-            #print("modified", path, self.model[path][idx], text)
-            row = self.model[path]
-            if idx == 0 or idx == 1:
-                self.model[path][idx] = str(text)
-                # Re-generate this one
-                master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
-                strx = lesspass.gen_pass(row[0] + row[1] + master + str(int(row[2])))
-                #print("strx", strx)
-                row[3] = strx[:int(row[5])]
-                hh = lesspass.USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
-                row[7] = sss
-            elif idx == 2:
-                try:
-                    self.model[path][idx] = str(int(text))
-                except:
-                    self.message("\nSerial field must be an integer.")
-                # Re-generate this one
-                master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
+        if  self.model[path][idx] == text:
+            return
 
-                strx = lesspass.gen_pass(row[0] + row[1] + master + str(int(row[2])))
-                #print("strx", strx)
-                row[3] = strx[:int(row[5])]
-                hh = lesspass.USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
-                row[7] = sss
+        if self.pgdebug > 1:
+            print("text_edited()", path, self.model[path][idx], text)
 
-            elif idx == 5:
-                try:
-                    self.model[path][idx] = str(int(text))
-                except:
-                    self.message("\nLength field must be an integer.")
-                    return
+        # Find backing data
+        ddd =  None
+        for aa in range(len(self.alldat)):
+            if self.alldat[aa][8] ==  self.model[path][8]:
+                #print("edited found:", aa)
+                ddd = self.alldat[aa]
+                break
+        if not ddd:
+            print("Internal error, no data backing found")
+            return
 
-                val = int(self.model[path][idx])
-                if val > 32 or val < 6:
-                    self.message(
-                    "\nLength field must be beteen 6 and 32 .. default (%d) saved." % DEF_LEN)
-                    self.model[path][idx] = str(DEF_LEN)
+        #row = self.model[path]
 
-                # Cut length as specified
-                for aa in self.alldat:
-                    if aa[8] ==  self.model[path][8]:
-                        #print("found:", aa)
-                        self.model[path][3] = aa[3][:val]
-                        break
+        if idx == 0 or idx == 1:
+            # Re-generate this one
+            ddd[idx] = text
+            ppp, hhh = lesspass.gen_pass_hash(ddd, self.master_save)
+            ddd[3] = ppp
+            ddd[7] = hhh
+        elif idx == 2:
+            try:
+                self.model[path][idx] = str(int(text))
+            except:
+                self.message("\nSerial field must be an integer.")
+                return
+            # Re-generate this one
+            ddd[idx] = text
+            ppp, hhh = lesspass.gen_pass_hash(ddd, self.master_save)
+            ddd[3] = ppp
+            ddd[7] = hhh
+        elif idx == 5:
+            try:
+                val = str(int(text))
+            except:
+                self.message("\nLength field must be an integer.")
+                return
+            valx = int(text)
+            if valx > 32 or valx < 6:
+                self.message(
+                "\nLength field must be beteen 6 and 32 .. default (%d) saved." % DEF_LEN)
+                xval = str(DEF_LEN)
 
-                self.tree.get_columns()[3].queue_resize()
+            ddd[idx] = str(valx)
+            self.tree.get_columns()[3].queue_resize()
+        elif idx == 4:
+            # Encrypt this
+            ddd[idx] = lesspass.enc_pass(text, lesspass.DEF_ENCPASS)
 
-            else:
-                # Default action
-                self.model[path][idx] = text
+        else:
+            # Default action
+            ddd[idx] =  text
 
-            # Edited, save it
-            rrr = self.model[path][0:]
-            # Grab original hash
-            for aa in self.alldat:
-                if rrr[8] == aa[8]:
-                    #print("found", aa)
-                    rrr[7] = aa[7]
+        # Pull  it back from storage
+        self.model[path] = self.rec_to_tree(ddd)
 
-            self.save_row(rrr)
+        # Edited, save it
+        self.save_row(ddd)
 
     def  onexit(self, arg, srg2 = None):
         #print("exit")
@@ -675,6 +718,8 @@ class MainWin(Gtk.Window):
                 inited &= False
             self.alldat.append(ddd)
 
+        global gl_cnt
+        gl_cnt = len(self.alldat)
         # This is running one time, always return FALSE
         return inited
 
@@ -682,35 +727,48 @@ class MainWin(Gtk.Window):
 
         ''' Transfer from in memory to screen '''
 
-        if self.pgdebug > 1:
+        if self.pgdebug > 3:
             print("data_to_tree()", len(self.alldat), "items")
 
         self.model.clear()
         for aa in range(len(self.alldat)):
             if self.alldat[aa][8] == MASTER_TEMPLATE:
                 continue
+
             bb = [*self.alldat[aa]]
-            #print("data_to_tree():", bb, "\n")
-            # Do not show data if not logged in
-            if self.master != FLAG_ON:
-                #print("skip, bb[3], bb[4]")
-                bb[3] = passx
-                bb[4] = passx
-            bb[7] = bb[7][:8] + " ... " + bb[7][:8]
-            #bb[8] = bb[8][:12]+ " ... "    # Used as unique ID
+            bb = self.rec_to_tree(bb)
+            #print("data_to_tree():",  bb, "\n")
             self.model.append(None, bb)
+
+    def rec_to_tree(self, cc):
+
+        # Start with copy
+        bb = cc[:]
+        # Do not show sensitive data if not master logged in
+        if self.master != FLAG_ON:
+            bb[3] = passx
+            bb[4] = passx
+        else:
+            ppp, hhh = lesspass.gen_pass_hash(bb, self.master_save)
+            # Cut length as specified
+            bb[3] = ppp[:int(bb[5])]
+
+        #print("bb[4]:", bb[4])
+        if bb[4] != "" and  bb[4] != passx:
+            try:
+                bb[4] = lesspass.dec_pass(bb[4], lesspass.DEF_ENCPASS)
+            except:
+                pass
+                #print("decrypt", sys.exc_info())
+
+        bb[7] = bb[7][:8] + " ... " + bb[7][:8]
+        return bb
 
     def save_row(self, row):
 
-        rrr = row[0:]    # Make it read / write
-        # Grab original data:
-        #for aa in self.alldat:
-        #    if aa[8] == row[8]:
-        #        print("found:", aa)
-        #        rrr[7] = aa[7]
-
-        rrr[3] = passx      # Not saving hash
-        if self.pgdebug > 1:
+        rrr = row[0:]           # Make it read / write
+        rrr[3] = passx          # Not saving hash
+        if self.pgdebug > 4:
             print("save_row", rrr)
 
         eee = self.pb.encode_data("", rrr)
@@ -754,7 +812,7 @@ class MainWin(Gtk.Window):
     def master_unlock(self):
 
         if self.pgdebug > 1:
-            print("master_unlock", self.master)
+            print("master_unlock")
 
         # Quick unlock, if locked
         if self.master == FLAG_ON:
@@ -782,28 +840,19 @@ class MainWin(Gtk.Window):
             #self.input2.set_text("")
             return
 
-        # It exist in for a shor time ...
-        #masterpass = lesspass.enc_pass(masterpass, DEF_ENCPASS)
-        ##print("masterpass_enc", masterpass)
-        #masterpass = lesspass.dec_pass(masterpass, DEF_ENCPASS)
-
+        self.master_save =  lesspass.enc_pass(masterpass, lesspass.DEF_ENCPASS)
+        masterpass = ""
         success = False
         flag = False
 
         for aa in self.alldat:
-            row = [*aa]
-            #print("strx", strx)
-            #print("chksum", row[7], sss)
-
+            drow = [*aa]
             # Not generated, do it
-            if len(row[7]) <= len(passx):
-                strx = row[0] + row[1] + masterpass + str(int(row[2]))
-                #print("strx:", strx)
-                hhh = lesspass.gen_hash(strx)
-                #print("gen", sss)
-                row[7] = hhh
-                #row[3] = lesspass.gen_pass(strx)
-                self.save_row(row)
+            if len(drow[7]) <= len(passx):
+                ppp, hhh = lesspass.gen_pass_hash(drow, self.master_save)
+                drow[7] = hhh
+                #drow[3] = lesspass.gen_pass(strx)
+                self.save_row(drow)
                 flag = True
 
         # Re - read if needed
@@ -817,9 +866,8 @@ class MainWin(Gtk.Window):
             if self.alldat[dd][8] == MASTER_TEMPLATE:
                 row = self.alldat[dd]
                 # Compare
-                strx = row[0] + row[1] + masterpass + str(int(row[2]))
-                sss = lesspass.gen_hash(strx)
-                if row[7] != sss:
+                ppp, hhh = lesspass.gen_pass_hash(row, self.master_save)
+                if row[7] != hhh:
                     #print("Invalid checksum")
                     global gl_try
                     if gl_try >= MAX_TRY:
@@ -843,17 +891,16 @@ class MainWin(Gtk.Window):
         for cc in range(len(self.alldat)):
             row = self.alldat[cc]
             # Compare
-            strx = row[0] + row[1] + masterpass + str(int(row[2]))
-            sss = lesspass.gen_hash(strx)
-            if row[7] != sss:
-                print("Invalid checksum")
-                self.message("Invalid Master pass on '%s'\n"
-                                "Possibly: damaged data." % row[0])
-
-            ppp = lesspass.gen_pass(strx)
+            ppp, hhh = lesspass.gen_pass_hash(row, self.master_save)
+            if row[7] != hhh:
+                print("Invalid checksum on", row[0])
+                self.message("Invalid Master pass on\n"
+                              "     '%s'     \n"
+                                "Possibly: damaged data.\n" % row[0])
             # save back to local data
-            row[3] = ppp[:int(row[5])]
+            #row[3] = ppp[:int(row[5])]
             #print("row[3]:", row[3])
+
             for aaa in range(len(self.cells)):
                 if editable[aaa]:
                     self.cells[aaa].set_property("editable", True)
@@ -861,7 +908,6 @@ class MainWin(Gtk.Window):
 
         if success:
             self.master = FLAG_ON
-            self.master_save =  lesspass.enc_pass(masterpass, DEF_ENCPASS)
 
             self.buttA.set_label("  Lock _Session  ")
             #print("unlocking", row[0:])
@@ -870,6 +916,7 @@ class MainWin(Gtk.Window):
             self.input.set_text(""); self.input.set_sensitive(False)
             self.input2.set_text("")
             self.input2.hide(); self.labconf.hide()
+            self.tree.grab_focus()
 
             self.status.set_markup_with_mnemonic(" <span foreground=\"#00AA00\">Unlocked. </span>" \
                         "You may now edit entries in line.")
@@ -903,8 +950,8 @@ class MainWin(Gtk.Window):
 
     def master_new(self, action):
 
-        if self.pgdebug:
-            print("master new pressed", self.input.get_text())
+        if self.pgdebug > 0:
+            print("master new pressed")
 
         if self.ini:
             if self.input.get_text() != self.input2.get_text():

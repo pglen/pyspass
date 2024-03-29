@@ -16,7 +16,7 @@ import pgutil
 
 class pgpasql():
 
-    def __init__(self, file):
+    def __init__(self, file, pgdebug = 0):
 
         #self.take = 0
 
@@ -223,7 +223,9 @@ class pgpasql():
         return rr
 
     def   rmone(self, kkk):
-        print("removing one:", "'" + kkk + "'" )
+
+        #print("removing one:", "'" + kkk + "'" )
+
         rr = None
         try:
             #c = self.conn.cursor()

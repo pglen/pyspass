@@ -2,15 +2,15 @@
 
 import sys, string, random, base64
 
+import pyvpacker
+
 from Crypto.Hash import SHA256
 from Crypto.Cipher import AES
 from Crypto.Hash import MD2
-
-USE_HASH    = SHA256
-
 from Crypto import Random
 
-import pyvpacker
+USE_HASH    = SHA256
+DEF_ENCPASS = "12345678"
 
 # Removed some punctuation chars, may be used as separators etc ...
 # Do not restructure this after you created / used some data as
@@ -22,6 +22,21 @@ import pyvpacker
 
 # Reduced for more compatibility
 Punct = "%+-:;=_"
+
+def gen_pass_hash(row, epass):
+
+    ''' generate all in one step '''
+
+    master = dec_pass(epass, DEF_ENCPASS)
+    try:
+        val =  int(row[2])
+    except:
+        val = 0
+    str_org = row[0] + row[1] + master + str(val)
+    ppp = gen_pass(str_org);  hhh = gen_hash(str_org)
+    # Destroy sensitive info
+    master = ""
+    return ppp, hhh
 
 def gen_hash(str_org):
 
@@ -42,7 +57,7 @@ def gen_pass(strx):
 
     # Make sure they are less than 255
     idl = string.ascii_lowercase * 2 + string.ascii_uppercase
-    ids = string.ascii_lowercase * 2 + string.ascii_uppercase + string.digits + Punct * 2
+    ids = string.ascii_lowercase * 3 + string.ascii_uppercase + string.digits + Punct * 2
     #print (len(ids), ids)
 
     xarr = []
