@@ -48,7 +48,7 @@ setuptools.setup(
     packages=setuptools.find_packages(include=includex),
     scripts = ['pyspassgui.py', ],
     py_modules = ["pyvpacker",],
-    package_data = {"icon" : ["noinfo.png",]},
+    package_data = {"pyspass" : ["noinfo.png",]},
     python_requires='>=3',
     entry_points={
         'console_scripts': [ "pyspassgui=pyspassgui:mainfunc",

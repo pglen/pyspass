@@ -10,16 +10,24 @@
 
 <p>Generates passes from Site / Login / Serial / Master Pass</p>
 
-<p>SHA512 strong. No passes are saved, only site, site login and serial is saved.
-The hashes are calculated at the time of master pass entry, and compared
-to the checksum field.</p>
+<p>SHA256 strong. No passes are saved, only site, site login name and
+serial number is saved.</p>
+
+<p>The hashes are calculated at the time of master pass entry, and compared
+to the checksum field. This assures that there are no sensitive items stored.</p>
+
+<p>The only item that cannot be calculated is the pass override. (custom pass)
+that is stored with AES encryption.</p>
 
 <p>Pass is displayed as a QR code. (For your eyes only)
 The default tab is for the site, the pass QR is not shown unless 'Auth' is
-selected.</p>
+selected, and the master pass is successfully entered.</p>
 
-<p><img src="screen2.png" alt="Screen Shot" title="" /></p>
+<p><img src="screen3.png" alt="Screen Shot" title="" /></p>
 
-<p>We selected 16 letter long pass as default.</p>
+<p>We selected 16 letter long pass as default. Below a table of
+  difficulty for breaking</p>
 
 <p><img src="passtable.png" alt="Screen Shot" title="" /></p>
+
+<p>// EOF</p>

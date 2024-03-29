@@ -222,14 +222,33 @@ class pgpasql():
             pass
         return rr
 
+    def   rmone(self, kkk):
+        print("removing one:", "'" + kkk + "'" )
+        rr = None
+        try:
+            #c = self.conn.cursor()
+            self.c.execute("delete from udata where key == ?", (kkk,))
+            self.conn.commit()
+            rr = self.c.fetchone()
+        except:
+            print("Cannot delete sql data for", kkk, sys.exc_info())
+        finally:
+            #c.close
+            pass
+        if rr:
+            return rr[1]
+        else:
+            return None
+
     # --------------------------------------------------------------------
     # Return None if no data
 
     def   rmall(self):
         print("removing all")
         try:
+            self.c.execute("delete from udata")
             #c = self.conn.cursor()
-            self.c.execute("delete from config")
+            self.conn.commit()
             rr = self.c.fetchone()
         except:
             print("Cannot delete sql data", sys.exc_info())

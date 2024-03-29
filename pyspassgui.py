@@ -38,6 +38,7 @@ def phelp():
     print( "Usage: " + os.path.basename(sys.argv[0]) + " [options]")
     print()
     print( "Options:    -d level  - Debug level 0-10")
+    print( "            -r dir    - Document root")
     print( "            -v        - Verbose")
     print( "            -V        - Version")
     print( "            -q        - Quiet")
@@ -52,13 +53,13 @@ def pversion():
 
     # option, long_option,  var_name,   initial_value, function
 optarrlong = \
-    ["p:",    "port",        "port",     9999,           None],      \
-    ["v",     "verbose",     "verbose",  0,              None],      \
-    ["q",     "quiet",       "quiet",    0,              None],      \
-    ["r",     "docroot",     "droot",    "~/.pyspass",   None],      \
-    ["d",     "debug",       "pgdebug",   0,             None],     \
-    ["V",     "version",     None,       None,           pversion],  \
-    ["h",     "help",        None,       None,           phelp],     \
+    ["d:",    "debug",       "pgdebug",  0,                 None],      \
+    ["r:",    "docroot",     "docroot",  "~/.pyspass",      None],      \
+    ["f:",    "file",        "file",     "passdata.sqlt",   None],      \
+    ["v",     "verbose",     "verbose",  0,                 None],      \
+    ["q",     "quiet",       "quiet",    0,                 None],      \
+    ["V",     "version",     None,       None,              pversion],  \
+    ["h",     "help",        None,       None,              phelp],     \
 
 conf = pgutil.ConfigLong(optarrlong)
 
@@ -68,14 +69,13 @@ def mainfunc():
     if conf.err:
         print(conf.err)
         sys.exit(1)
-
-    mainwin.loadicon()
-
-    #conf.printvars()
-    basedir = os.path.expanduser(conf.droot)
+    if conf.pgdebug > 6:
+        conf.printvars()
+    basedir = os.path.expanduser(conf.docroot)
     if not os.path.isdir(basedir):
-        #print("Make dir", basedir)
-        os.mkdir(basedir)
+        if conf.pgdebug > 2:
+            print("Make dir", basedir)
+            os.mkdir(basedir)
 
     os.chdir(basedir)
 

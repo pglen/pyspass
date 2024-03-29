@@ -25,27 +25,52 @@ from gi.repository import GObject
 from gi.repository import GdkPixbuf
 from gi.repository import Pango
 
-DEF_LEN     = 16            # Default pass len
-MAX_TRY     = 4             # Maximum pass try
-USE_HASH    = SHA256
-MASTER      = "e86c1b3c-eb7c-11ee-9b87-4b6ca61ffd8e"
+DEF_LEN     = 14            # Default pass len
+MAX_TRY     =  4            # Maximum pass try
+MASTER_TEMPLATE = "e86c1b3c-eb7c-11ee-9b87-4b6ca61ffd8e"
 
-# Fields become editable
+(F_DOM, F_LOG,
+F_SER, F_HASH,
+F_NOTE, F_ID) = list(range(6))
+
+DEF_ENCPASS = "12345678"
+
+# Make even and odd flags for obfuscation. This way boolean desision
+# is made on an integer instead of 0 and 1
+
+for aa in range(6):
+    r1 = random.randint(0, 100000); FLAG_ON  =  (r1 // 2) * 2
+    r2 = random.randint(0, 100000); FLAG_OFF =  (r2 // 2) * 2 + 1
+    # Unlikely, but catch it
+    if FLAG_ON != FLAG_OFF:
+        break
+
+#print("flags:", FLAG_ON, FLAG_OFF)
+
+# Field names
 fields = ("Site", "Login", "Serial", "Pass", "Override",
             "Len", "Notes",  "ChkSum", "UUID",  )
 
+# Fields become editable (ordinal sensitive)
+editable  = (True, True, True, False, True,
+            True, True,  False, False,  )
+
+# Fields centerred  (ordinal sensitive)
+centered  = ( False, False, True, False, False,
+                True, False,  False, False,  )
+
+# No blank sheet
 initial = [ \
-                (MASTER,    "template.com", "username1"),
-                 ("",       "example.com",  "username2"),
+                (MASTER_TEMPLATE, "template.com", "username"),
+                 ("",             "example.com",  "username"),
+                 ("",             "domain.com",   "username"),
           ]
 
-passx   = " - " * 10
+# Placeholder
+passx   = " - " * 6
+
 gl_try  = 0
 verbose = 0
-
-def loadicon():
-    global noimg
-    noimg = Gtk.Image.new_from_file("noinfo.png")
 
 # ------------------------------------------------------------------------
 
@@ -56,15 +81,19 @@ class MainWin(Gtk.Window):
         Gtk.Window.__init__(self, Gtk.WindowType.TOPLEVEL)
         self.sql = sqlfile
         self.pgdebug = pgdebug
-        self.master = False
-        self.master_save = ""
+        self.master = FLAG_OFF
+        # So this is never empty, add bogus default
+        self.master_save =  lesspass.enc_pass(DEF_ENCPASS, DEF_ENCPASS)
         self.alldat = []
         self.ini = False
-        self.pb  = pyvpacker.packbin()
-        #self.darr = []
+        self.pb = pyvpacker.packbin()
+        self.noimg = None
+        self.loadicon()
+        self.autolog = 0
 
-        #self = Gtk.Window(Gtk.WindowType.TOPLEVEL)
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
+        #print("pgdebug", self.pgdebug)
         self.set_title("PysPass Password Manager")
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
 
@@ -92,13 +121,13 @@ class MainWin(Gtk.Window):
         else:
             self.set_default_size(6*www/8, 6*hhh/8)
 
-        self.connect("destroy", self.OnExit)
-        #self.connect("key-press-event", self.key_press_event)
-        #self.connect("button-press-event", self.button_press_event)
+        self.connect("destroy", self.onexit)
+        self.connect("key-press-event", self.key_press_event)
+        self.connect("button-press-event", self.button_press_event)
 
         try:
             #self.set_icon_from_file("icon.png")
-            self.set_icon(noimg.get_pixbuf())
+            self.set_icon(self.noimg.get_pixbuf())
         except:
             pass
 
@@ -121,9 +150,13 @@ class MainWin(Gtk.Window):
         hbox4.pack_start(Gtk.Label("  "), 0, 0, 2)
 
         lab2 = Gtk.Label("  Status:   ");  hbox4.pack_start(lab2, 0, 0, 0)
-        self.status = Gtk.Label("Idle.");
+        self.status = Gtk.Label.new_with_mnemonic("Idle.");
         self.status.set_xalign(0)
         hbox4.pack_start(self.status, 1, 1, 0)
+        self.collab = Gtk.Label("   ")
+        self.collab.override_background_color(Gtk.StateFlags.NORMAL,
+                                                    Gdk.RGBA(.99, .1, .1))
+        hbox4.pack_start(self.collab, 0, 0, 0)
 
         tt = type(""); fff = []
         for ccc in range(len(fields)):
@@ -136,6 +169,7 @@ class MainWin(Gtk.Window):
         self.cells = []; cntf = 0
         for aa in fields:
             col = Gtk.TreeViewColumn(aa, self.cellx(cntf), text=cntf)
+            col.set_resizable(True)
             self.tree.append_column(col)
             cntf += 1
 
@@ -143,10 +177,10 @@ class MainWin(Gtk.Window):
         self.data_to_tree()
 
         if self.ini:
-            self.labn = Gtk.Label.new_with_mnemonic("  New m_aster Pass:")
-            self.labn.set_markup_with_mnemonic(" <span foreground=\"#AA0000\"> !!! New M_aster Pass: !!! </span>")
+            self.labn = Gtk.Label.new_with_mnemonic("  New master Pass:")
+            self.labn.set_markup_with_mnemonic(" <span foreground=\"#AA0000\"> !!! New M    aster Pass: !!! </span>")
         else:
-            self.labn = Gtk.Label.new_with_mnemonic("  M_aster Pass:")
+            self.labn = Gtk.Label.new_with_mnemonic("  Master Pass:")
 
         hbox4.pack_start(self.labn, 0, 0, 4)
 
@@ -187,7 +221,7 @@ class MainWin(Gtk.Window):
         hbox4.pack_start(Gtk.Label(" "), 0, 0, 0)
 
         butt2 = Gtk.Button.new_with_mnemonic("    E_xit    ")
-        butt2.connect("clicked", self.OnExit, self)
+        butt2.connect("clicked", self.onexit, self)
         hbox4.pack_start(butt2, False, 0, 0)
 
         lab2 = Gtk.Label("   ");  hbox4.pack_start(lab2, 0, 0, 2)
@@ -226,32 +260,33 @@ class MainWin(Gtk.Window):
         self.hpane.set_position(300)
 
         self.scroll = Gtk.ScrolledWindow()
-        self.scroll.add_with_viewport(self.tree)
+        #self.scroll.add_with_viewport(self.tree)
+        self.scroll.add(self.tree)
 
         #vbox3 = Gtk.VBox()
         #vbox3.pack_start(self.scroll, 1, 1, 0)
 
         hbox6 = Gtk.HBox()
 
-        hbox6.pack_start(Gtk.Label("   "), 0, 0, 2)
+        hbox6.pack_start(Gtk.Label("  "), 0, 0, 2)
 
         butt1 = Gtk.Button.new_with_mnemonic("   Copy Lo_gin  ")
         butt1.connect("clicked", self.copy)
         hbox6.pack_start(butt1, 0, 0, 2)
-        butt2 = Gtk.Button.new_with_mnemonic("   Copy Pass  ")
+        butt2 = Gtk.Button.new_with_mnemonic("   Copy P_ass  ")
         butt2.connect("clicked", self.copy2)
         hbox6.pack_start(butt2, 0, 0, 2)
-        butt2a = Gtk.Button.new_with_mnemonic("   Copy Override  ")
+        butt2a = Gtk.Button.new_with_mnemonic("   Copy O_verride  ")
         butt2a.connect("clicked", self.copy3)
         hbox6.pack_start(butt2a, 0, 0, 2)
 
-        hbox6.pack_start(Gtk.Label(" "), 0, 0, 2)
+        #hbox6.pack_start(Gtk.Label(" "), 0, 0, 2)
 
-        buttc = Gtk.CheckButton.new_with_mnemonic("  Allow A_dmin  ")
+        buttc = Gtk.CheckButton.new_with_mnemonic("Allow A_dmin")
         buttc.connect("toggled", self.allow_adm)
         hbox6.pack_start(buttc, 0, 0, 2)
 
-        self.butt_new = Gtk.Button.new_with_mnemonic("   _New Row  ")
+        self.butt_new = Gtk.Button.new_with_mnemonic("  _New Row  ")
         self.butt_new.set_sensitive(False)
         self.butt_new.connect("clicked", self.add_newrow)
         hbox6.pack_start(self.butt_new, 0, 0, 2)
@@ -261,16 +296,16 @@ class MainWin(Gtk.Window):
         self.butt_del.connect("clicked", self.del_row)
         hbox6.pack_start(self.butt_del, 0, 0, 2)
 
-        self.butt_export = Gtk.Button.new_with_mnemonic("   Export  ")
+        self.butt_export = Gtk.Button.new_with_mnemonic("  Export  ")
         self.butt_export.set_sensitive(False)
         self.butt_export.connect("clicked", self.export)
-        hbox6.pack_start(self.butt_export, 0, 0, 2)
+        hbox6.pack_start(self.butt_export, 1, 1, 2)
 
-        buttp = Gtk.CheckButton.new_with_mnemonic("  Show passes   ")
-        buttp.connect("toggled", self.show_passes)
-        hbox6.pack_start(buttp, 0, 0, 2)
+        self.buttp = Gtk.CheckButton.new_with_mnemonic(" Show passes ")
+        self.buttp.connect("toggled", self.show_passes)
+        hbox6.pack_start(self.buttp, 0, 0, 2)
 
-        hbox6.pack_start(Gtk.Label(" "), 1, 1, 2)
+        hbox6.pack_start(Gtk.Label(" "), 0, 0, 2)
 
         self.hpane.add(self.scroll)
         self.hpane.add(self.pad)
@@ -290,14 +325,19 @@ class MainWin(Gtk.Window):
         self.add(vbox)
         self.show_all()
 
-        # Hde after general show
+        # Hide after general show
         if not self.ini:
             self.input2.hide()
 
         self.input.grab_focus_without_selecting()
 
         self.stat_time = 0
-        GLib.timeout_add(1000, self.timer)
+        GLib.timeout_add(1000, self.stat_timer)
+        GLib.timeout_add(5000, self.autologout)
+
+    def loadicon(self):
+        base = os.path.dirname(os.path.realpath(__file__))
+        self.noimg = Gtk.Image.new_from_file(base + os.sep + "noinfo.png")
 
     def run(self):
         Gtk.main()
@@ -312,6 +352,8 @@ class MainWin(Gtk.Window):
         flag = arg.get_active()
         self.butt_new.set_sensitive(flag)
         self.butt_del.set_sensitive(flag)
+        self.butt_export.set_sensitive(flag)
+
 
     def export(self, arg):
         pass
@@ -329,33 +371,49 @@ class MainWin(Gtk.Window):
 
             return
         # Do not re lock / unlock from keyboard
-        if not self.master:
+        if self.master != FLAG_ON:
             self.master_unlock()
 
+    def _pre_copy(self):
+        if self.master != FLAG_ON:
+            self.message("Cannot copy record if master key is not entered.")
+            raise ValuError
+        sel = self.tree.get_selection()
+        tree, curr = sel.get_selected()
+        if not curr:
+            self.message("Please select a row to copy from.")
+            raise ValuError
+        return curr
+
     def copy(self, arg):
-        print("Called copy")
-        if not self.master:
-            self.message("Cannot copy record if master key is not entered")
+        try:
+            curr = self._pre_copy()
+        except:
             return
         self.status.set_text("Copied login name")
         self.stat_time = 5;
+        ttt = self.tree.get_model().get_value(curr, 1)
+        self.clipboard.set_text(ttt, len(ttt))
 
     def copy2(self, arg):
-        print("Called copy2")
-        if not self.master:
-            self.message("Cannot copy auth record (pass) if master key is not entered")
+        try:
+            curr = self._pre_copy()
+        except:
             return
         self.status.set_text("Copied pass")
         self.stat_time = 5;
+        ttt = self.tree.get_model().get_value(curr, 2)
+        self.clipboard.set_text(ttt, len(ttt))
 
     def copy3(self, arg):
-        print("Called copy3")
-        if not self.master:
-            self.message("Cannot copy override record if master key is not entered")
+        try:
+            curr = self._pre_copy()
+        except:
             return
-
         self.status.set_text("Copied override")
         self.stat_time = 5;
+        ttt = self.tree.get_model().get_value(curr, 3)
+        self.clipboard.set_text(ttt, len(ttt))
 
     def row_activate(self, arg1):
         sel = self.tree.get_selection()
@@ -372,42 +430,60 @@ class MainWin(Gtk.Window):
 
     def del_row(self, arg1):
 
-        if not self.master:
-            self.message("Cannot delete record if master key is not entered")
+        #print("del_row()", arg1)
+
+        if self.master != FLAG_ON:
+            self.message("Cannot delete record if master key is not entered.")
             return
 
         sel = self.tree.get_selection()
         tree, curr = sel.get_selected()
         if not curr:
-            self.message("Plase select a row to delete")
+            self.message("Please select a row to delete.")
             return
 
-        #print(tree, curr)
-        #iter = tree.get_iter_first()
-        #while True:
-        #    if not iter:
-        #        break
-        #    print(tree.get_value(iter, 8))
-        #    iter = tree.iter_next(iter)
-
-        if tree.get_value(curr, 8) == MASTER:
-            self.message("Cannot delete master")
+        id = tree.get_value(curr, 8)
+        if id == MASTER_TEMPLATE:
+            self.message("Cannot delete master template.")
             return
-        tree.remove(curr)
+
+        print("remove row", curr, id)
+        for aa in range(len(self.alldat)):
+            try:
+                if self.alldat[aa][8] == id:
+                    del self.alldat[aa]
+                    ret = self.sql.rmone(id)
+                    print("ret:", ret)
+                    #break # If multiple entries with the same ID, nuke em
+
+            except:
+                pass
+
+        ret = tree.remove(curr)
+
 
     def add_newrow(self, arg1):
 
-        if not self.master:
-            self.message("Cannot add record if master key is not entered")
+        if self.master != FLAG_ON:
+            self.message("Cannot add record if master key is not entered.")
             return
 
         #(random.random() * 100)
         xlen = len(self.model)
-        self.model.append(None,
-                ("host_%d" % xlen, "login",  "0", passx, passx, str(DEF_LEN),
-                    "Notes Here", "Chksum", str(uuid.uuid1()),)
+
+        ddd = ( \
+                "host_%d" % xlen, "login",  "0", passx, passx, str(DEF_LEN),
+                    "Notes Here", "Chksum", str(uuid.uuid1()),
               )
 
+        master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
+        strx = ddd[0] + ddd[1] + master + str(int(ddd[2]))
+        ppp = lesspass.gen_pass(strx)
+        hhh = lesspass.gen_hash(strx)
+
+        #self.model.append(None, ddd)
+        self.alldat.append(ddd)
+        self.data_to_tree()
         sel = self.tree.get_selection()
         iter = self.model.get_iter_first()
 
@@ -419,6 +495,7 @@ class MainWin(Gtk.Window):
             iter = iter2
         sel.select_iter(iter)
 
+
     def apply_qr(self, strx, passx, over, site):
         #print ("new QR", strx)
 
@@ -426,7 +503,7 @@ class MainWin(Gtk.Window):
         dd = self.image2pixbuf(qq)
         self.edit4.set_from_pixbuf(dd)
 
-        if self.master:
+        if self.master != FLAG_ON:
             qq =  qrcode.make(strx, version=1)
             dd = self.image2pixbuf(qq)
             self.edit.set_from_pixbuf(dd)
@@ -437,9 +514,9 @@ class MainWin(Gtk.Window):
             dd = self.image2pixbuf(qq)
             self.edit3.set_from_pixbuf(dd)
         else:
-            self.edit.set_from_pixbuf(noimg.get_pixbuf())
-            self.edit2.set_from_pixbuf(noimg.get_pixbuf())
-            self.edit3.set_from_pixbuf(noimg.get_pixbuf())
+            self.edit.set_from_pixbuf(self.noimg.get_pixbuf())
+            self.edit2.set_from_pixbuf(self.noimg.get_pixbuf())
+            self.edit3.set_from_pixbuf(self.noimg.get_pixbuf())
 
     def image2pixbuf(self, im):
         """Convert Pillow image to GdkPixbuf"""
@@ -454,9 +531,8 @@ class MainWin(Gtk.Window):
 
     def cellx(self, idx):
         cell = Gtk.CellRendererText()
-        #cell.set_property("editable", True)
 
-        if 1: #idx == 2:
+        if centered[idx]:
             cell.set_property("alignment", Pango.Alignment.CENTER)
             cell.set_property("align-set", True)
             cell.set_alignment(0.5, 0.)
@@ -467,8 +543,8 @@ class MainWin(Gtk.Window):
 
     def text_edited(self, widget, path, text, idx):
 
-        if not self.master:
-            self.message("Cannot edit if master key is not entered")
+        if self.master != FLAG_ON:
+            self.message("Cannot edit if master key is not entered.")
             return
         #print("edited", text, idx)
         # Changed?
@@ -478,43 +554,63 @@ class MainWin(Gtk.Window):
             if idx == 0 or idx == 1:
                 self.model[path][idx] = str(text)
                 # Re-generate this one
-                master = self.master_save
+                master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
                 strx = lesspass.gen_pass(row[0] + row[1] + master + str(int(row[2])))
                 #print("strx", strx)
                 row[3] = strx[:int(row[5])]
-                hh = USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
+                hh = lesspass.USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
                 row[7] = sss
             elif idx == 2:
                 try:
                     self.model[path][idx] = str(int(text))
                 except:
-                    self.message("\nSerial field must be an integer")
+                    self.message("\nSerial field must be an integer.")
                 # Re-generate this one
-                master = self.master_save
+                master = lesspass.dec_pass(self.master_save, DEF_ENCPASS)
+
                 strx = lesspass.gen_pass(row[0] + row[1] + master + str(int(row[2])))
                 #print("strx", strx)
                 row[3] = strx[:int(row[5])]
-                hh = USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
+                hh = lesspass.USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
                 row[7] = sss
 
             elif idx == 5:
                 try:
                     self.model[path][idx] = str(int(text))
                 except:
-                    self.message("\nLength field must be an integer")
+                    self.message("\nLength field must be an integer.")
+                    return
 
                 val = int(self.model[path][idx])
                 if val > 32 or val < 6:
-                    self.model[path][idx] = str(DEF_LEN)
                     self.message(
                     "\nLength field must be beteen 6 and 32 .. default (%d) saved." % DEF_LEN)
+                    self.model[path][idx] = str(DEF_LEN)
+
+                # Cut length as specified
+                for aa in self.alldat:
+                    if aa[8] ==  self.model[path][8]:
+                        #print("found:", aa)
+                        self.model[path][3] = aa[3][:val]
+                        break
+
+                self.tree.get_columns()[3].queue_resize()
+
             else:
+                # Default action
                 self.model[path][idx] = text
 
-            #self.master_unlock()
-            self.save_row(self.model[path], int(path))
+            # Edited, save it
+            rrr = self.model[path][0:]
+            # Grab original hash
+            for aa in self.alldat:
+                if rrr[8] == aa[8]:
+                    #print("found", aa)
+                    rrr[7] = aa[7]
 
-    def  OnExit(self, arg, srg2 = None):
+            self.save_row(rrr)
+
+    def  onexit(self, arg, srg2 = None):
         #print("exit")
         self.exit_all()
 
@@ -526,19 +622,19 @@ class MainWin(Gtk.Window):
 
     def load_data(self):
 
-        ''' Return True if samples are not resent '''
+        ''' Load samples. Set ini flag if no passes are present.
+            Create some data if none present. '''
 
-        ret = True
-        self.model.clear()
+        inited = True
         kkk = self.sql.getunikeys()
         #print("keys", kkk)
         if not kkk:
             fake = []
-            #print("Init data")
-            # fill in something (so no blank sheet effect)
+            if self.pgdebug > 1:
+                print(" Create Init data")
+
+            # Fill in sensible defaults (avoid blank sheet effect)
             serial = "0"; xlen = str(DEF_LEN)
-
-
             for uid, host, login in initial:
                 if not uid:
                     uid = str(uuid.uuid1())
@@ -551,6 +647,7 @@ class MainWin(Gtk.Window):
                 self.sql.putuni(aa[8], ddd)
             kkk = self.sql.getunikeys()
 
+        # (Re) read data
         for bb in kkk:
             #print(bb[0])
             ppp = self.sql.getuni(bb[0])
@@ -560,176 +657,231 @@ class MainWin(Gtk.Window):
             except:
                 print("Cannot decode", ppp);
                 ddd = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-                continue
+                #continue
 
-            #print("ddd", ddd)
+            if self.pgdebug > 3:
+                print("ddd:", ddd)
+
+            if ddd[7] != passx:
+                inited &= False
             self.alldat.append(ddd)
 
-            #if ddd[4] != passx:
-            #    #self.darr.append(lesspass.dec_pass(ddd[4], self.input.get_text()))
-            #    ddd[4] = passx
-            #    self.darr.append(ddd[4])
-            #else:
-
-            #self.darr.append(ddd[4])
-            if ddd[7] != passx:
-                ret &=  False
-
-        return ret
+        # This is running one time, always return FALSE
+        return inited
 
     def data_to_tree(self):
 
+        ''' Transfer from in memory to screen '''
+
+        if self.pgdebug > 1:
+            print("data_to_tree()", len(self.alldat), "items")
+
         self.model.clear()
-
         for aa in range(len(self.alldat)):
-
-            if self.alldat[aa][8] == MASTER:
+            if self.alldat[aa][8] == MASTER_TEMPLATE:
                 continue
-
             bb = [*self.alldat[aa]]
-            print("\nRead:", bb)
-
+            #print("data_to_tree():", bb, "\n")
             # Do not show data if not logged in
-            if not self.master:
+            if self.master != FLAG_ON:
+                #print("skip, bb[3], bb[4]")
                 bb[3] = passx
                 bb[4] = passx
+            bb[7] = bb[7][:8] + " ... " + bb[7][:8]
+            #bb[8] = bb[8][:12]+ " ... "    # Used as unique ID
             self.model.append(None, bb)
 
-    def save_row(self, row, cnt):
-        rrr = row[0:]
-        #rrr[3] = passx
-        #if len(self.darr[cnt]) == 1:
-        #    rrr[4] = self.darr[cnt]
-        rrr[3] = passx
-        print("cnt", cnt, "save_row row", rrr)
+    def save_row(self, row):
+
+        rrr = row[0:]    # Make it read / write
+        # Grab original data:
+        #for aa in self.alldat:
+        #    if aa[8] == row[8]:
+        #        print("found:", aa)
+        #        rrr[7] = aa[7]
+
+        rrr[3] = passx      # Not saving hash
+        if self.pgdebug > 1:
+            print("save_row", rrr)
+
         eee = self.pb.encode_data("", rrr)
         self.sql.putuni(rrr[8], eee)
 
     # --------------------------------------------------------------------
     def master_lock(self, butt = None):
 
-        if self.master:
-            self.status.set_text("Locked Master pass")
+        if self.pgdebug > 1:
+            print("Master lock")
+
+        if self.master != FLAG_OFF:
+            self.status.set_markup_with_mnemonic("<span foreground=\"#AA0000\">" \
+                        "Locked </span> Master pass.")
             self.stat_time = 4;
 
-        self.master = False
+        self.master = FLAG_OFF
         self.input.set_text("")
         self.input2.set_text("")
-
+        self.input.set_sensitive(True)
         self.buttA.set_label("   Unlo_ck   ")
 
+        # Clear displayed secrets
         for row in self.model:
             row[3] = passx
             row[4] = passx
 
+        self.tree.get_columns()[3].queue_resize()
+
+        self.collab.override_background_color(Gtk.StateFlags.NORMAL,
+                                                    Gdk.RGBA(.99, .1, .1))
+        # No more editing
         for aa in self.cells:
             aa.set_property("editable", False)
 
+        # Blank out QRs
         self.apply_qr("", "", "", "")
 
     # ------------------------------------------------------------------------------
 
     def master_unlock(self):
 
-        print("master_unlock")
+        if self.pgdebug > 1:
+            print("master_unlock", self.master)
 
-        # Quick unlock
-        if self.master:
-            #self.message("\nAlready unlocked")
-            self.master_lock()
-            return
-        master = self.input.get_text()
-        if not master:
-            self.message("\nCannot use empty Master Pass")
+        # Quick unlock, if locked
+        if self.master == FLAG_ON:
+            self.message("\nAlready unlocked.")
             return
 
-        if len(master) < 6:
-            self.message("\nCannot use less than 6 chars")
+        flag = self.buttp.get_active()
+        if flag:
+            self.buttp.set_active(not flag)
+            flag = self.buttp.get_active()
+
+            self.input.set_visibility(flag)
+            self.input2.set_visibility(flag)
+
+        masterpass = self.input.get_text()
+        self.input.set_text("")
+
+        # It exist in for a shor time ...
+        #print("masterpass org", masterpass)
+        masterpass = lesspass.enc_pass(masterpass, DEF_ENCPASS)
+        #print("masterpass_enc", masterpass)
+        masterpass = lesspass.dec_pass(masterpass, DEF_ENCPASS)
+        print("masterpass pro", masterpass)
+
+        if not masterpass:
+            self.message("\nCannot use empty Master Pass.")
+            return
+
+        if len(masterpass) < 6:
+            self.message("\nCannot use less than 6 chars.")
             #self.input.set_text("")
             #self.input2.set_text("")
             return
-
-        #if self.ini:
-        #    self.ini = self.load_data()
         success = False
+        flag = False
 
-        cno = 0
-        for row in self.model:
-            print("\ndata:", *row)
-            strx = lesspass.gen_pass(row[0] + row[1] + master + str(int(row[2])))
+        for aa in self.alldat:
+            row = [*aa]
             #print("strx", strx)
-            hh = USE_HASH.new(); hh.update(strx.encode()); sss = hh.hexdigest()
-            print("chksum", row[7], sss)
+            #print("chksum", row[7], sss)
+
+            # Not generated, do it
             if len(row[7]) <= len(passx):
+                strx = row[0] + row[1] + masterpass + str(int(row[2]))
+                #print("strx:", strx)
+                hhh = lesspass.gen_hash(strx)
                 #print("gen", sss)
-                row[7] = sss
+                row[7] = hhh
+                #row[3] = lesspass.gen_pass(strx)
+                self.save_row(row)
+                flag = True
 
-            #print("darr", self.darr)
-            #if not self.darr:
-            #    #print("no darr, row", row)
-            #    continue
+        # Re - read if needed
+        if flag:
+            self.alldat = []
+            self.load_data()
 
-            #if len(self.darr[cno]) == 1:
-            #    print("decode", self.darr[cno])
-            #    row[4] = self.darr[cno][2]
-            #else:
-            if 1:
+        # Look at template first:
+        auth = False
+        for dd in range(len(self.alldat)):
+            if self.alldat[dd][8] == MASTER_TEMPLATE:
+                row = self.alldat[dd]
+                # Compare
+                strx = row[0] + row[1] + masterpass + str(int(row[2]))
+                sss = lesspass.gen_hash(strx)
                 if row[7] != sss:
-                    print("Invalid checksum")
+                    #print("Invalid checksum")
                     global gl_try
-                    if gl_try > MAX_TRY:
-                        self.message("Too many tries")
+                    if gl_try >= MAX_TRY:
+                        time.sleep(.3)
+                        self.message("\nToo many tries. Exit program, and try again.")
+                        time.sleep(.3)
                         self.input.set_text("")
                         return
-
-                    self.message("Invalid Master pass")
+                    self.message("\nInvalid Master pass.\n")
                     usleep(20)
                     self.input.set_text("")
-
-                    self.status.set_text("Sleeping on retry")
+                    self.status.set_text("Sleeping on retry ...")
                     self.stat_time = 2;
                     time.sleep(.3)
                     gl_try += 1
+                    return
+                else:
                     break
 
-            row[3] = strx[:int(row[5])]
-            self.model[cno] = [*row]
-            #self.save_row(self.model[cno], cno)
+        # Second scan, display it
+        for cc in range(len(self.alldat)):
+            row = self.alldat[cc]
+            # Compare
+            strx = row[0] + row[1] + masterpass + str(int(row[2]))
+            sss = lesspass.gen_hash(strx)
+            if row[7] != sss:
+                print("Invalid checksum")
+                self.message("Invalid Master pass on '%s'\n"
+                                "Possibly: damaged data." % row[0])
 
-            #for aa in range(self.tree.get_n_columns()):
-            #ttt = self.tree.get_column(aa)
-
-            for aa in range(len(self.cells)):
-                if aa != 3 and aa != 7 and aa != 8:
-                    self.cells[aa].set_property("editable", True)
+            ppp = lesspass.gen_pass(strx)
+            # save back to local data
+            row[3] = ppp[:int(row[5])]
+            #print("row[3]:", row[3])
+            for aaa in range(len(self.cells)):
+                if editable[aaa]:
+                    self.cells[aaa].set_property("editable", True)
             success = True
-            cno += 1
 
         if success:
-            self.master = True
-            self.master_save =  master
-            self.buttA.set_label("  Lock _Session  ")
-            self.data_to_tree()
+            self.master = FLAG_ON
+            self.master_save =  lesspass.enc_pass(masterpass, DEF_ENCPASS)
 
+            self.buttA.set_label("  Lock _Session  ")
             #print("unlocking", row[0:])
             self.row_activate(None)
             self.labn.set_markup_with_mnemonic(" M_aster Pass:")
-            self.input.set_text("")
+            self.input.set_text(""); self.input.set_sensitive(False)
             self.input2.set_text("")
-            self.input2.hide()
-            self.labconf.hide()
-            self.status.set_text("Unlocked. You may now edit entries in line.")
+            self.input2.hide(); self.labconf.hide()
+
+            self.status.set_markup_with_mnemonic(" <span foreground=\"#00AA00\">Unlocked. </span>" \
+                        "You may now edit entries in line.")
             self.stat_time = 6
+            self.collab.override_background_color(Gtk.StateFlags.NORMAL,
+                                                    Gdk.RGBA(.1, .99, .1))
+            # Copy data to display
+            self.data_to_tree()
         else:
             self.status.set_text("Unlock failed.")
             self.stat_time = 6
 
     def key_press_event(self, win, event):
         #print( "key_press_event", win, event)
+        self.autolog = 0
         pass
 
     def button_press_event(self, win, event):
         #print( "button_press_event", win, event)
+        self.autolog = 0
         pass
 
     def message(self, strx):
@@ -743,13 +895,15 @@ class MainWin(Gtk.Window):
 
     def master_new(self, action):
 
-        #print("master pressed", self.input.get_text())
+        if self.pgdebug:
+            print("master new pressed", self.input.get_text())
 
         if self.ini:
             if self.input.get_text() != self.input2.get_text():
                 self.message("\nThe two passes must be equal.")
                 return
-        if self.master:
+
+        if self.master == FLAG_ON:
             self.master_lock()
         else:
             self.master_unlock()
@@ -762,32 +916,51 @@ class MainWin(Gtk.Window):
         # Close dialog on user response
         #dialog.connect ("response", lambda d, r: d.destroy())
         #dialog.show()
-
         warnings.simplefilter("ignore")
         strx = action.get_name()
         warnings.simplefilter("default")
-
         print ("activate_action", strx)
 
     def activate_quit(self, action):
         print( "activate_quit called")
-        self.OnExit(False)
+        self.onexit(False)
 
     def activate_exit(self, action):
         print( "activate_exit called" )
-        self.OnExit(False)
+        self.onexit(False)
 
     def activate_about(self, action):
         print( "activate_about called")
         pass
 
-    def timer(self):
+    def stat_timer(self):
         #print("Timer fired")
         if self.stat_time:
             self.stat_time -= 1
             if self.stat_time <= 0:
                 self.status.set_text("Idle")
         return True
+
+    def autologout(self):
+        #print("Autologout", self.autolog)
+        if self.master == FLAG_ON:
+            self.autolog += 1
+            if self.autolog > 5:
+                self.master_lock()
+            if self.autolog == 5:
+                self.status.set_text("AutoLogout soon, press any key to stop it.")
+                self.stat_time = 6;
+
+        return True
+
+    def nextfield(self, treeview, path, next_column):
+
+        #print("nextfield()", path, next_column)
+        ret = treeview.set_cursor( path, next_column, True)
+        #print("ret:", ret)
+        usleep(10)
+        ret2 = treeview.scroll_to_cell(path, next_column, True, 1., 1.)
+        #print("ret2:", ret2)
 
     def onTreeNavigateKeyPress(self, treeview, event):
         keyname = Gdk.keyval_name(event.keyval)
@@ -796,24 +969,30 @@ class MainWin(Gtk.Window):
         colnum = columns.index(col)
         #print("colnum", colnum, "columns", columns)
 
-        if keyname == 'Tab':
-            # Walk to next editable
-            newcol = colnum + 1
-            while True:
-                if newcol < len(columns):
-                    next_column = columns[newcol]
-                    ed = self.cells[newcol].get_property("editable")
-                    if ed:
-                        #print("ed", ed)
-                        break
-                else:
-                    next_column = columns[0]
-                    break
-                newcol += 1
+        #print("event", event.state, keyname)
 
-            GLib.timeout_add(50,
-                             treeview.set_cursor,
-                             path, next_column, True)
+        # Did not work, lost editing on shift
+        if keyname == 'Tab' or keyname == 'Shift_L':
+
+            if event.state &  Gdk.ModifierType.SHIFT_MASK:
+                #print("reverse")
+                pass
+            else:
+                # Walk to next editable
+                newcol = colnum + 1
+                while True:
+                    if newcol < len(columns):
+                        next_column = columns[newcol]
+                        ed = self.cells[newcol].get_property("editable")
+                        if ed:
+                            #print("ed", ed)
+                            break
+                    else:
+                        next_column = columns[0]
+                        break
+                    newcol += 1
+
+            GLib.timeout_add(50, self.nextfield, treeview, path, next_column)
 
         elif keyname == 'Return':
 
@@ -834,12 +1013,10 @@ class MainWin(Gtk.Window):
         else:
             pass
 
-
 # Start of program:
 
-#if __name__ == '__main__':
-#
-#    mainwin = MainWin()
-#    Gtk.main()
+if __name__ == '__main__':
+
+    print("This module was not meant to be run as main.")
 
 # EOF
