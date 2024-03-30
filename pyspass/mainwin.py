@@ -86,14 +86,15 @@ class MainWin(Gtk.Window):
         self.sql = sqlfile
         self.pgdebug = pgdebug
         self.master = FLAG_OFF
+        self.alldat = []
         # So this is never empty, add bogus default
         self.master_save =  lesspass.enc_pass(lesspass.DEF_ENCPASS, lesspass.DEF_ENCPASS)
-        self.alldat = []
         self.ini = False
         self.pb = pyvpacker.packbin()
         self.noimg = None
         self.loadicon()
         self.autolog = 0
+        self.dx = 0; self.dy = 0
 
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
@@ -128,6 +129,7 @@ class MainWin(Gtk.Window):
         self.connect("destroy", self.onexit)
         self.connect("key-press-event", self.key_press_event)
         self.connect("button-press-event", self.button_press_event)
+        self.connect("motion-notify-event", self.motion_notify_event)
 
         try:
             #self.set_icon_from_file("icon.png")
@@ -170,6 +172,8 @@ class MainWin(Gtk.Window):
         self.tree.connect("cursor-changed", self.row_activate)
         self.tree.connect("key-press-event", self.onTreeNavigateKeyPress)
         self.tree.connect("button-press-event", self.tree_press_event)
+
+        self.tree.set_enable_search(False)
 
         self.cells = []; cntf = 0
         for aa in fields:
@@ -347,6 +351,17 @@ class MainWin(Gtk.Window):
     def run(self):
         Gtk.main()
 
+    def motion_notify_event(self, win, event):
+        #print("motion_notify_event", win, event)
+        self.dx = self.dx - event.x
+        self.dy = self.dy - event.y
+        thresh = 3
+        #print("motion:", self.dx, self.dy)
+        if abs(self.dx) > thresh or abs(self.dy) > thresh:
+            #print("Motion", self.dx, self.dy)
+            self.autolog = 0
+        self.dx = event.x; self.dy = event.y
+
     def _create_menuitem(self, string, action, arg = None):
         rclick_menu = Gtk.MenuItem(string)
         rclick_menu.connect("activate", action, string, arg);
@@ -354,7 +369,7 @@ class MainWin(Gtk.Window):
         return rclick_menu
 
     def menu_copy(self, menu, menutext, arg):
-        print("menu", menutext, arg)
+        #print("menu", menutext, arg)
         if arg == 0:
             pass
         elif arg == 1:
@@ -363,6 +378,8 @@ class MainWin(Gtk.Window):
             self.copy3(0)
         elif arg == 3:
             self.copy(0)
+        elif arg == 4:
+            self.copy4(0)
 
     def tree_press_event(self, widget, event):
         if event.type == Gdk.EventType.BUTTON_PRESS:
@@ -376,6 +393,7 @@ class MainWin(Gtk.Window):
                     menu.append(self._create_menuitem("Copy Pass", self.menu_copy, 1))
                     menu.append(self._create_menuitem("Copy Override", self.menu_copy, 2))
                     menu.append(self._create_menuitem("Copy User (login) name", self.menu_copy, 3))
+                    menu.append(self._create_menuitem("Copy domain name", self.menu_copy, 4))
                 menu.popup_at_pointer(event)
 
     def show_passes(self, arg):
@@ -390,22 +408,29 @@ class MainWin(Gtk.Window):
         self.butt_export.set_sensitive(flag)
 
     def export(self, arg):
-        print("Export")
-
+        #print("Export")
         if self.master != FLAG_ON:
             self.message("Cannot export if master key is not entered.")
             return
 
-        fp = open("export.txt", "wb")
+        fname = ""; progname = "prog.txt"
+        for aa in range(10):
+            fname =  "export_%d.txt" % aa
+            #print(fname)
+            if not os.path.isfile(fname):
+                break
 
+        #print("aa", aa)
+
+        fp = open(fname, "wb")
         for aa in self.alldat:
             #print(aa)
             bstr = ", ".join(aa)
-            #for bb in aa:
-            #    bstr += bb.encode()
             fp.write(bstr.encode() + b"\n")
 
         fp.close()
+        self.status.set_text("Exported Data to '%s'" % fname)
+        self.stat_time = 5;
 
     def activate2(self, arg1):
         #print("activate2")
@@ -463,6 +488,16 @@ class MainWin(Gtk.Window):
         ttt = self.tree.get_model().get_value(curr, 4)
         self.clipboard.set_text(ttt, len(ttt))
 
+    def copy4(self, arg):
+        try:
+            curr = self._pre_copy()
+        except:
+            return
+        self.status.set_text("Copied override")
+        self.stat_time = 5;
+        ttt = self.tree.get_model().get_value(curr, 0)
+        self.clipboard.set_text(ttt, len(ttt))
+
     def row_activate(self, arg1):
         sel = self.tree.get_selection()
         tree, curr = sel.get_selected()
@@ -501,10 +536,8 @@ class MainWin(Gtk.Window):
             try:
                 if self.alldat[aa][8] == id:
                     del self.alldat[aa]
-                    ret = self.sql.rmone(id)
-                    print("ret:", ret)
+                    self.sql.rmone(id)
                     # break # If multiple entries with the same ID, nuke em
-
             except:
                 pass
 
@@ -543,7 +576,6 @@ class MainWin(Gtk.Window):
                 break
             iter = iter2
         sel.select_iter(iter)
-
 
     def apply_qr(self, strx, passx, over, site):
         #print ("new QR", strx)
@@ -623,6 +655,9 @@ class MainWin(Gtk.Window):
             ppp, hhh = lesspass.gen_pass_hash(ddd, self.master_save)
             ddd[3] = ppp
             ddd[7] = hhh
+            self.tree.get_columns()[0].queue_resize()
+            self.tree.get_columns()[1].queue_resize()
+
         elif idx == 2:
             try:
                 self.model[path][idx] = str(int(text))
@@ -912,7 +947,7 @@ class MainWin(Gtk.Window):
             self.buttA.set_label("  Lock _Session  ")
             #print("unlocking", row[0:])
             self.row_activate(None)
-            self.labn.set_markup_with_mnemonic(" M_aster Pass:")
+            self.labn.set_markup_with_mnemonic(" Maste_r Pass:")
             self.input.set_text(""); self.input.set_sensitive(False)
             self.input2.set_text("")
             self.input2.hide(); self.labconf.hide()
@@ -1011,11 +1046,15 @@ class MainWin(Gtk.Window):
     def nextfield(self, treeview, path, next_column):
 
         #print("nextfield()", path, next_column)
-        ret = treeview.set_cursor( path, next_column, True)
-        #print("ret:", ret)
-        usleep(10)
-        ret2 = treeview.scroll_to_cell(path, next_column, True, 1., 1.)
-        #print("ret2:", ret2)
+        try:
+            #ret = treeview.set_cursor(path, next_column, True)
+            ret = treeview.set_cursor_on_cell(path, next_column, None, True)
+            #print("ret:", ret)
+            usleep(50)
+            #ret2 = treeview.scroll_to_cell(path, next_column, False, 0.5, 0.5)
+            #print("ret2:", ret2)
+        except:
+            pass
 
     def onTreeNavigateKeyPress(self, treeview, event):
         keyname = Gdk.keyval_name(event.keyval)
@@ -1023,29 +1062,22 @@ class MainWin(Gtk.Window):
         columns = [c for c in treeview.get_columns()]
         colnum = columns.index(col)
         #print("colnum", colnum, "columns", columns)
-
         #print("event", event.state, keyname)
 
-        # Did not work, lost editing on shift
-        if keyname == 'Tab' or keyname == 'Shift_L':
-
-            if event.state &  Gdk.ModifierType.SHIFT_MASK:
-                #print("reverse")
-                pass
-            else:
-                # Walk to next editable
-                newcol = colnum + 1
-                while True:
-                    if newcol < len(columns):
-                        next_column = columns[newcol]
-                        ed = self.cells[newcol].get_property("editable")
-                        if ed:
-                            #print("ed", ed)
-                            break
-                    else:
-                        next_column = columns[0]
+        if keyname == 'Tab': # or keyname == 'Shift_L':
+            # Walk to next editable
+            newcol = colnum + 1
+            while True:
+                if newcol < len(columns):
+                    next_column = columns[newcol]
+                    ed = self.cells[newcol].get_property("editable")
+                    if ed:
+                        #print("ed", ed)
                         break
-                    newcol += 1
+                else:
+                    next_column = columns[0]
+                    break
+                newcol += 1
 
             GLib.timeout_add(50, self.nextfield, treeview, path, next_column)
 

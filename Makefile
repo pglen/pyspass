@@ -36,6 +36,7 @@ clean:
 cleandata:
 	rm -f passdata.sqlt
 	rm -f ~/.pyspass/passdata.sqlt
+	rm -f ~/.pyspass/*.txt
 
 git:
 	git add .
