@@ -1,33 +1,71 @@
-<h1>pyspass</h1>
+<h1>The Python Simple Password manager</h1>
 
-<h2>Password manager</h2>
+<p>pyspass, a Python / PyGObject version of the popular password manager concept.</p>
 
-<p>Under construction. DO NOT USE.</p>
+<p>Generate / Store site passwords and logins. This program will
+securely manage all your logins. It can also generate site credentials for you
+by using the minimal information necessary to do so.</p>
 
-<h2>Password generator / manager</h2>
+<h2>Trust</h2>
 
-<p>A python / PyGObject version of the popular password manager concept.</p>
+<p>The program is open sourced, so you may look at its source code, understand
+its workings, and verify that no 'oversight' is present to leak your
+confidential information.</p>
 
-<p>Generates passes from Site / Login / Serial / Master Pass</p>
+<h2>Password generator / manager, how it works</h2>
 
-<p>SHA256 strong. No passes are saved, only site, site login name and
-serial number is saved.</p>
+<p>PysPass generates passes from:</p>
 
-<p>The hashes are calculated at the time of master pass entry, and compared
-to the checksum field. This assures that there are no sensitive items stored.</p>
+<pre><code>    Site Address // Login Name // Serial Number // Master Pass
+</code></pre>
 
-<p>The only item that cannot be calculated is the pass override. (custom pass)
+<p>You may enter a password override if the generated password is not
+satisfactory. The override is saved encrypted, using state of the art AES
+encryption.</p>
+
+<h2>Release one</h2>
+
+<p>The fundamentals are working. Pass generation, override, editing, export
+are all functional.
+SHA256 strong. No passes are saved, only site, site login name and
+serial number is saved.
+ The hashes are calculated at the time of master pass entry, and compared
+to the checksum field. This assures that there are no sensitive items stored.
+ The only item that cannot be calculated is the pass override. (custom pass)
 that is stored with AES encryption.</p>
 
-<p>Pass is displayed as a QR code. (For your eyes only)
-The default tab is for the site, the pass QR is not shown unless 'Auth' is
-selected, and the master pass is successfully entered.</p>
+<h2>The QR codes</h2>
 
-<p><img src="screen3.png" alt="Screen Shot" title="" /></p>
+<p>Information is displayed as a QR code. (For your eyes only)
+The default tab is for the site, the pass QR is not shown unless
+the master pass is successfully entered and the  'Auth' tab is selected.</p>
 
-<p>We selected 16 letter long pass as default. Below a table of
-  difficulty for breaking</p>
+<h2>Safety, security</h2>
+
+<p>The SHA256 hash algorithm is considered unbreakable, and the AES encryption
+is also unbreakable as in 2024. Because only the hashes are stored, no
+comprizable items are saved.</p>
+
+<p><img src="pyspass3.png" alt="Screen Shot" title="" /></p>
+
+<p>We selected 14 letter long pass as default. Below a table of
+difficulty for breaking. You may override the pass length dynamically.
+The relevant table column is the:</p>
+
+<pre><code>"Numbers Upper and Lower case letter and symbols.
+</code></pre>
+
+<p>We use a limited set of symbols, for greater compatibility with sites.</p>
 
 <p><img src="passtable.png" alt="Screen Shot" title="" /></p>
+
+<p>The serial number field is provided to modify the generated pass, in case
+a new pass is required for the same site.</p>
+
+<p>The User Interface operates on hot keys that are chosen specifically to be
+close to the left alt key. This allows the left hand to initiate quick action
+while driving the mouse with the right hand. The usage of the alt key
+accelerators are optional, the UI is completely happy with any method of
+operating it.</p>
 
 <p>// EOF</p>
